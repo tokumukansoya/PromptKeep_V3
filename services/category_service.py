@@ -18,7 +18,12 @@ from config import MAX_CATEGORY_DEPTH
 from models.app_state import AppState
 from models.category import Category
 from services.data_service import DataService
-from exceptions import CategoryNotFoundError, InvalidCategoryDepthError
+from exceptions import (
+    CategoryNotFoundError,
+    InvalidCategoryDepthError,
+    ValidationError,
+    DataPersistenceError,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -62,25 +67,33 @@ class CategoryService:
             CategoryNotFoundError: 親カテゴリが存在しない場合。
             InvalidCategoryDepthError: 深さ制約（最大階層）に違反する場合。
         """
-        if parent_id is not None and state.get_category(parent_id) is None:
-            logger.error(f"Parent category not found: {parent_id}")
-            raise CategoryNotFoundError(f"親カテゴリが見つかりません: {parent_id}")
+        try:
+            if parent_id is not None and state.get_category(parent_id) is None:
+                logger.error("Parent category not found: %s", parent_id)
+                raise CategoryNotFoundError(f"親カテゴリが見つかりません: {parent_id}")
 
-        parent_depth = self._get_depth(state, parent_id) if parent_id else 0
-        new_depth = parent_depth + 1
-        if new_depth > MAX_CATEGORY_DEPTH:
-            logger.error(
-                f"Category depth exceeds limit on create: {new_depth} > {MAX_CATEGORY_DEPTH}"
-            )
-            raise InvalidCategoryDepthError(
-                f"カテゴリ階層が深すぎます（最大 {MAX_CATEGORY_DEPTH}）"
-            )
+            parent_depth = self._get_depth(state, parent_id) if parent_id else 0
+            new_depth = parent_depth + 1
+            if new_depth > MAX_CATEGORY_DEPTH:
+                logger.error(
+                    "Category depth exceeds limit on create: %s > %s",
+                    new_depth,
+                    MAX_CATEGORY_DEPTH,
+                )
+                raise InvalidCategoryDepthError(
+                    f"カテゴリ階層が深すぎます（最大 {MAX_CATEGORY_DEPTH}）"
+                )
 
-        order = self._next_order_for_parent(state, parent_id)
-        category = Category.create(name=name, parent_id=parent_id, order=order)
-        state.categories.append(category)
-        logger.info(f"Created category: {category.id} (parent={parent_id})")
-        return category
+            order = self._next_order_for_parent(state, parent_id)
+            category = Category.create(name=name, parent_id=parent_id, order=order)
+            state.categories.append(category)
+            logger.info("Created category: %s (parent=%s)", category.id, parent_id)
+            return category
+        except (CategoryNotFoundError, InvalidCategoryDepthError):
+            raise
+        except Exception as exc:
+            logger.exception("Failed to create category")
+            raise ValidationError(f"カテゴリの作成に失敗しました: {exc}")
 
     def update_category(self, state: AppState, category_id: str, name: str) -> Category:
         """既存カテゴリの名称を更新する。
@@ -96,14 +109,20 @@ class CategoryService:
         Raises:
             CategoryNotFoundError: 対象カテゴリが存在しない場合。
         """
-        category = state.get_category(category_id)
-        if category is None:
-            logger.error(f"Category not found: {category_id}")
-            raise CategoryNotFoundError(f"カテゴリが見つかりません: {category_id}")
+        try:
+            category = state.get_category(category_id)
+            if category is None:
+                logger.error("Category not found: %s", category_id)
+                raise CategoryNotFoundError(f"カテゴリが見つかりません: {category_id}")
 
-        category.name = name
-        logger.info(f"Updated category name: {category_id}")
-        return category
+            category.name = name
+            logger.info("Updated category name: %s", category_id)
+            return category
+        except CategoryNotFoundError:
+            raise
+        except Exception as exc:
+            logger.exception("Failed to update category: %s", category_id)
+            raise ValidationError(f"カテゴリの更新に失敗しました: {exc}")
 
     def delete_category(self, state: AppState, category_id: str) -> None:
         """カテゴリを削除する。
@@ -117,24 +136,32 @@ class CategoryService:
         Raises:
             CategoryNotFoundError: 対象カテゴリが存在しない場合。
         """
-        target = state.get_category(category_id)
-        if target is None:
-            logger.error(f"Category not found: {category_id}")
-            raise CategoryNotFoundError(f"カテゴリが見つかりません: {category_id}")
+        try:
+            target = state.get_category(category_id)
+            if target is None:
+                logger.error("Category not found: %s", category_id)
+                raise CategoryNotFoundError(f"カテゴリが見つかりません: {category_id}")
 
-        to_remove: Set[str] = self._get_descendant_ids(state, category_id)
-        to_remove.add(category_id)
+            to_remove: Set[str] = self._get_descendant_ids(state, category_id)
+            to_remove.add(category_id)
 
-        before = len(state.categories)
-        state.categories = [c for c in state.categories if c.id not in to_remove]
-        after = len(state.categories)
+            before = len(state.categories)
+            state.categories = [c for c in state.categories if c.id not in to_remove]
+            after = len(state.categories)
 
-        # 削除したカテゴリの親の兄弟順序を再採番
-        self._reindex_siblings(state, target.parent_id)
+            # 削除したカテゴリの親の兄弟順序を再採番
+            self._reindex_siblings(state, target.parent_id)
 
-        logger.info(
-            f"Deleted category subtree: root={category_id}, removed={before - after}"
-        )
+            logger.info(
+                "Deleted category subtree: root=%s, removed=%s",
+                category_id,
+                before - after,
+            )
+        except CategoryNotFoundError:
+            raise
+        except Exception as exc:
+            logger.exception("Failed to delete category: %s", category_id)
+            raise ValidationError(f"カテゴリの削除に失敗しました: {exc}")
 
     def get_category(self, state: AppState, category_id: str) -> Category:
         """ID でカテゴリを取得する。
@@ -149,11 +176,17 @@ class CategoryService:
         Raises:
             CategoryNotFoundError: 対象カテゴリが存在しない場合。
         """
-        category = state.get_category(category_id)
-        if category is None:
-            logger.error(f"Category not found: {category_id}")
-            raise CategoryNotFoundError(f"カテゴリが見つかりません: {category_id}")
-        return category
+        try:
+            category = state.get_category(category_id)
+            if category is None:
+                logger.error("Category not found: %s", category_id)
+                raise CategoryNotFoundError(f"カテゴリが見つかりません: {category_id}")
+            return category
+        except CategoryNotFoundError:
+            raise
+        except Exception as exc:
+            logger.exception("Failed to get category: %s", category_id)
+            raise DataPersistenceError(f"カテゴリ取得に失敗しました: {exc}")
 
     def list_categories(self, state: AppState) -> List[Category]:
         """すべてのカテゴリを取得する。
@@ -164,7 +197,11 @@ class CategoryService:
         Returns:
             `Category` のリスト。
         """
-        return list(state.categories)
+        try:
+            return list(state.categories)
+        except Exception as exc:
+            logger.exception("Failed to list categories")
+            raise DataPersistenceError(f"カテゴリ取得に失敗しました: {exc}")
 
     def move_category(
         self, state: AppState, category_id: str, new_parent_id: Optional[str]
@@ -185,57 +222,68 @@ class CategoryService:
             CategoryNotFoundError: 対象カテゴリまたは親カテゴリが存在しない場合。
             InvalidCategoryDepthError: 深さ制約に違反、または循環参照となる場合。
         """
-        category = state.get_category(category_id)
-        if category is None:
-            logger.error(f"Category not found: {category_id}")
-            raise CategoryNotFoundError(f"カテゴリが見つかりません: {category_id}")
+        try:
+            category = state.get_category(category_id)
+            if category is None:
+                logger.error("Category not found: %s", category_id)
+                raise CategoryNotFoundError(f"カテゴリが見つかりません: {category_id}")
 
-        if new_parent_id is not None:
-            new_parent = state.get_category(new_parent_id)
-            if new_parent is None:
-                logger.error(f"Parent category not found: {new_parent_id}")
-                raise CategoryNotFoundError(
-                    f"親カテゴリが見つかりません: {new_parent_id}"
+            if new_parent_id is not None:
+                new_parent = state.get_category(new_parent_id)
+                if new_parent is None:
+                    logger.error("Parent category not found: %s", new_parent_id)
+                    raise CategoryNotFoundError(
+                        f"親カテゴリが見つかりません: {new_parent_id}"
+                    )
+            else:
+                new_parent = None
+
+            # 循環参照の防止（自身または子孫を親にできない）
+            descendants = self._get_descendant_ids(state, category_id)
+            if new_parent_id is not None and new_parent_id in descendants.union(
+                {category_id}
+            ):
+                logger.error(
+                    "Cyclic category move detected: %s -> %s",
+                    category_id,
+                    new_parent_id,
                 )
-        else:
-            new_parent = None
+                raise InvalidCategoryDepthError("循環参照は許可されていません")
 
-        # 循環参照の防止（自身または子孫を親にできない）
-        descendants = self._get_descendant_ids(state, category_id)
-        if new_parent_id is not None and new_parent_id in descendants.union(
-            {category_id}
-        ):
-            logger.error(
-                f"Cyclic category move detected: {category_id} -> {new_parent_id}"
+            # 深さ検証：新しい親の深さ + サブツリーの高さ <= MAX
+            parent_depth = self._get_depth(state, new_parent_id) if new_parent else 0
+            subtree_height = self._get_subtree_max_depth(state, category_id)
+            if parent_depth + subtree_height > MAX_CATEGORY_DEPTH:
+                logger.error(
+                    "Category move exceeds depth limit: parent_depth=%s, subtree_height=%s, max=%s",
+                    parent_depth,
+                    subtree_height,
+                    MAX_CATEGORY_DEPTH,
+                )
+                raise InvalidCategoryDepthError(
+                    f"カテゴリ階層が深すぎます（最大 {MAX_CATEGORY_DEPTH}）"
+                )
+
+            # 親変更と order の付与（新親の末尾へ）
+            old_parent_id = category.parent_id
+            category.parent_id = new_parent_id
+            category.order = self._next_order_for_parent(state, new_parent_id)
+
+            # 旧親の兄弟順序を再採番
+            self._reindex_siblings(state, old_parent_id)
+
+            logger.info(
+                "Moved category: %s from parent=%s to parent=%s",
+                category_id,
+                old_parent_id,
+                new_parent_id,
             )
-            raise InvalidCategoryDepthError("循環参照は許可されていません")
-
-        # 深さ検証：新しい親の深さ + サブツリーの高さ <= MAX
-        parent_depth = self._get_depth(state, new_parent_id) if new_parent else 0
-        subtree_height = self._get_subtree_max_depth(state, category_id)
-        if parent_depth + subtree_height > MAX_CATEGORY_DEPTH:
-            logger.error(
-                "Category move exceeds depth limit: parent_depth=%s, subtree_height=%s, max=%s",
-                parent_depth,
-                subtree_height,
-                MAX_CATEGORY_DEPTH,
-            )
-            raise InvalidCategoryDepthError(
-                f"カテゴリ階層が深すぎます（最大 {MAX_CATEGORY_DEPTH}）"
-            )
-
-        # 親変更と order の付与（新親の末尾へ）
-        old_parent_id = category.parent_id
-        category.parent_id = new_parent_id
-        category.order = self._next_order_for_parent(state, new_parent_id)
-
-        # 旧親の兄弟順序を再採番
-        self._reindex_siblings(state, old_parent_id)
-
-        logger.info(
-            f"Moved category: {category_id} from parent={old_parent_id} to parent={new_parent_id}"
-        )
-        return category
+            return category
+        except (CategoryNotFoundError, InvalidCategoryDepthError):
+            raise
+        except Exception as exc:
+            logger.exception("Failed to move category: %s", category_id)
+            raise ValidationError(f"カテゴリの移動に失敗しました: {exc}")
 
     def validate_depth(self, category_path: List[str]) -> bool:
         """カテゴリ階層長の単純検証を行う。

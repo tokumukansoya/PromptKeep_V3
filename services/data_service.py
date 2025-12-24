@@ -100,13 +100,13 @@ class DataService:
             return state
 
         except json.JSONDecodeError as e:
-            logger.error(f"JSON decode error: {e}")
+            logger.exception("JSON decode error while loading state")
             raise InvalidDataError(f"JSON の形式が不正です: {e}")
         except IOError as e:
-            logger.error(f"File read error: {e}")
+            logger.exception("File read error while loading state")
             raise DataPersistenceError(f"ファイル読み込みに失敗しました: {e}")
         except (ValueError, TypeError) as e:
-            logger.error(f"Data validation error: {e}")
+            logger.exception("Data validation error while loading state")
             raise InvalidDataError(f"データ形式が不正です: {e}")
 
     def save(self, state: AppState) -> None:
@@ -126,11 +126,12 @@ class DataService:
             >>> service.save(state)
         """
         temp_file = self.prompts_file.with_suffix(".tmp")
+        backup_path: Optional[Path] = None
 
         try:
             # 既存ファイルがあればバックアップ
             if self.prompts_file.exists():
-                self.create_backup()
+                backup_path = self.create_backup()
 
             # テンポラリファイルに書き込み
             with open(temp_file, "w", encoding="utf-8") as f:
@@ -144,17 +145,22 @@ class DataService:
             )
 
         except IOError as e:
-            logger.error(f"File write error: {e}")
+            logger.exception("File write error during save")
             if temp_file.exists():
                 temp_file.unlink()
+            # ロールバック（バックアップ復元を試みる）
+            if backup_path:
+                self.restore_from_backup(str(backup_path))
             raise DataPersistenceError(f"ファイル保存に失敗しました: {e}")
         except Exception as e:
-            logger.error(f"Unexpected error during save: {e}")
+            logger.exception("Unexpected error during save")
             if temp_file.exists():
                 temp_file.unlink()
+            if backup_path:
+                self.restore_from_backup(str(backup_path))
             raise DataPersistenceError(f"予期しないエラーが発生しました: {e}")
 
-    def create_backup(self) -> None:
+    def create_backup(self) -> Optional[Path]:
         """現在のプロンプトファイルをバックアップ。
 
         Raises:
@@ -162,7 +168,7 @@ class DataService:
         """
         try:
             if not self.prompts_file.exists():
-                return
+                return None
 
             from datetime import datetime
 
@@ -174,9 +180,11 @@ class DataService:
                     dst.write(src.read())
 
             logger.debug(f"Backup created: {backup_file}")
+            return backup_file
 
         except IOError as e:
             logger.warning(f"Failed to create backup: {e}")
+            return None
 
     def restore_from_backup(self, backup_file: Optional[str] = None) -> bool:
         """バックアップからデータを復元。

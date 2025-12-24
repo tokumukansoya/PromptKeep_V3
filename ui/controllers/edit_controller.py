@@ -1,11 +1,15 @@
 from __future__ import annotations
 
 import logging
-from typing import Callable, List
+from typing import Callable, List, Optional
+
+import flet as ft
 
 from models.app_state import AppState
 from services.prompt_service import PromptService
 from services.data_service import DataService
+from ui.components.common.snackbar import show_snackbar
+from ui.styles.colors import ERROR_COLOR, SUCCESS_COLOR
 
 logger = logging.getLogger(__name__)
 
@@ -27,7 +31,12 @@ class EditController:
         """
         self._prompt_service = prompt_service
         self._data_service = data_service
+        self._page: Optional[ft.Page] = None
         logger.debug("EditController initialized")
+
+    def attach_page(self, page: ft.Page) -> None:
+        """Snackbar 表示用に Flet `Page` を関連付ける。"""
+        self._page = page
 
     def on_save(
         self,
@@ -64,8 +73,12 @@ class EditController:
             )
             self._data_service.save(state)
             logger.info("Prompt saved: %s", prompt_id)
+            if self._page:
+                show_snackbar(self._page, "保存しました", bgcolor=SUCCESS_COLOR)
         except Exception as e:
-            logger.error("Failed to save prompt '%s': %s", prompt_id, e)
+            logger.exception("Failed to save prompt '%s'", prompt_id)
+            if self._page:
+                show_snackbar(self._page, "保存に失敗しました", bgcolor=ERROR_COLOR)
 
     def on_back(self, on_view_change: Callable[[], None]) -> None:
         """編集ビューから戻る遷移を実行する。
@@ -80,4 +93,6 @@ class EditController:
             on_view_change()
             logger.debug("Back navigation from EditView executed")
         except Exception as e:
-            logger.error("Failed to navigate back from EditView: %s", e)
+            logger.exception("Failed to navigate back from EditView")
+            if self._page:
+                show_snackbar(self._page, "画面遷移に失敗しました", bgcolor=ERROR_COLOR)

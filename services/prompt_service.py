@@ -15,6 +15,7 @@ from exceptions import (
     PromptNotFoundError,
     InvalidCategoryDepthError,
     ValidationError,
+    DataPersistenceError,
 )
 from config import MAX_CATEGORY_DEPTH
 
@@ -63,20 +64,28 @@ class PromptService:
             >>> service = PromptService(data_service)
             >>> prompt = service.create_prompt("タイトル", "本文")
         """
-        if category_path is None:
-            category_path = []
+        try:
+            if category_path is None:
+                category_path = []
 
-        if len(category_path) > MAX_CATEGORY_DEPTH:
-            logger.error(
-                f"Category depth exceeds limit: {len(category_path)} > {MAX_CATEGORY_DEPTH}"
-            )
-            raise InvalidCategoryDepthError(
-                f"カテゴリ階層が深すぎます（最大 {MAX_CATEGORY_DEPTH}）"
-            )
+            if len(category_path) > MAX_CATEGORY_DEPTH:
+                logger.error(
+                    "Category depth exceeds limit: %s > %s",
+                    len(category_path),
+                    MAX_CATEGORY_DEPTH,
+                )
+                raise InvalidCategoryDepthError(
+                    f"カテゴリ階層が深すぎます（最大 {MAX_CATEGORY_DEPTH}）"
+                )
 
-        prompt = Prompt.create(title, body, category_path)
-        logger.info(f"Created prompt: {prompt.id}")
-        return prompt
+            prompt = Prompt.create(title, body, category_path)
+            logger.info("Created prompt: %s", prompt.id)
+            return prompt
+        except InvalidCategoryDepthError:
+            raise
+        except Exception as exc:
+            logger.exception("Failed to create prompt")
+            raise ValidationError(f"プロンプトの作成に失敗しました: {exc}")
 
     def get_prompt(self, state: AppState, prompt_id: str) -> Prompt:
         """ID でプロンプトを取得。
@@ -95,11 +104,17 @@ class PromptService:
             >>> service = PromptService(data_service)
             >>> prompt = service.get_prompt(state, "id123")
         """
-        prompt = state.get_prompt(prompt_id)
-        if prompt is None:
-            logger.error(f"Prompt not found: {prompt_id}")
-            raise PromptNotFoundError(f"プロンプトが見つかりません: {prompt_id}")
-        return prompt
+        try:
+            prompt = state.get_prompt(prompt_id)
+            if prompt is None:
+                logger.error("Prompt not found: %s", prompt_id)
+                raise PromptNotFoundError(f"プロンプトが見つかりません: {prompt_id}")
+            return prompt
+        except PromptNotFoundError:
+            raise
+        except Exception as exc:
+            logger.exception("Failed to get prompt: %s", prompt_id)
+            raise DataPersistenceError(f"プロンプト取得に失敗しました: {exc}")
 
     def update_prompt(
         self,
@@ -134,24 +149,35 @@ class PromptService:
             ...     state, "id123", title="新しいタイトル"
             ... )
         """
-        prompt = self.get_prompt(state, prompt_id)
+        try:
+            prompt = self.get_prompt(state, prompt_id)
 
-        if title is not None:
-            prompt.title = title
-        if body is not None:
-            prompt.body = body
-        if category_path is not None:
-            if len(category_path) > MAX_CATEGORY_DEPTH:
-                raise InvalidCategoryDepthError(
-                    f"カテゴリ階層が深すぎます（最大 {MAX_CATEGORY_DEPTH}）"
-                )
-            prompt.category_path = category_path
-        if favorite is not None:
-            prompt.favorite = favorite
+            if title is not None:
+                prompt.title = title
+            if body is not None:
+                prompt.body = body
+            if category_path is not None:
+                if len(category_path) > MAX_CATEGORY_DEPTH:
+                    logger.error(
+                        "Category depth exceeds limit on update: %s > %s",
+                        len(category_path),
+                        MAX_CATEGORY_DEPTH,
+                    )
+                    raise InvalidCategoryDepthError(
+                        f"カテゴリ階層が深すぎます（最大 {MAX_CATEGORY_DEPTH}）"
+                    )
+                prompt.category_path = category_path
+            if favorite is not None:
+                prompt.favorite = favorite
 
-        prompt.updated_at = datetime.now()
-        logger.info(f"Updated prompt: {prompt_id}")
-        return prompt
+            prompt.updated_at = datetime.now()
+            logger.info("Updated prompt: %s", prompt_id)
+            return prompt
+        except (PromptNotFoundError, InvalidCategoryDepthError):
+            raise
+        except Exception as exc:
+            logger.exception("Failed to update prompt: %s", prompt_id)
+            raise ValidationError(f"プロンプトの更新に失敗しました: {exc}")
 
     def delete_prompt(self, state: AppState, prompt_id: str) -> None:
         """プロンプトを削除（論理削除）。
@@ -168,13 +194,19 @@ class PromptService:
         Example:
             >>> service.delete_prompt(state, "id123")
         """
-        prompt = self.get_prompt(state, prompt_id)
+        try:
+            prompt = self.get_prompt(state, prompt_id)
 
-        prompt.deleted_at = datetime.now()
-        if prompt_id not in state.trash:
-            state.trash.append(prompt_id)
+            prompt.deleted_at = datetime.now()
+            if prompt_id not in state.trash:
+                state.trash.append(prompt_id)
 
-        logger.info(f"Deleted prompt: {prompt_id}")
+            logger.info("Deleted prompt: %s", prompt_id)
+        except PromptNotFoundError:
+            raise
+        except Exception as exc:
+            logger.exception("Failed to delete prompt: %s", prompt_id)
+            raise ValidationError(f"プロンプトの削除に失敗しました: {exc}")
 
     def restore_prompt(self, state: AppState, prompt_id: str) -> None:
         """削除したプロンプトを復元。
@@ -191,13 +223,19 @@ class PromptService:
         Example:
             >>> service.restore_prompt(state, "id123")
         """
-        prompt = self.get_prompt(state, prompt_id)
+        try:
+            prompt = self.get_prompt(state, prompt_id)
 
-        prompt.deleted_at = None
-        if prompt_id in state.trash:
-            state.trash.remove(prompt_id)
+            prompt.deleted_at = None
+            if prompt_id in state.trash:
+                state.trash.remove(prompt_id)
 
-        logger.info(f"Restored prompt: {prompt_id}")
+            logger.info("Restored prompt: %s", prompt_id)
+        except PromptNotFoundError:
+            raise
+        except Exception as exc:
+            logger.exception("Failed to restore prompt: %s", prompt_id)
+            raise ValidationError(f"プロンプトの復元に失敗しました: {exc}")
 
     def list_active_prompts(self, state: AppState) -> List[Prompt]:
         """削除されていないプロンプトを取得。
@@ -211,7 +249,11 @@ class PromptService:
         Example:
             >>> prompts = service.list_active_prompts(state)
         """
-        return state.get_active_prompts()
+        try:
+            return state.get_active_prompts()
+        except Exception as exc:
+            logger.exception("Failed to list active prompts")
+            raise DataPersistenceError(f"プロンプト取得に失敗しました: {exc}")
 
     def list_deleted_prompts(self, state: AppState) -> List[Prompt]:
         """削除されたプロンプトを取得（ゴミ箱用）。
@@ -225,7 +267,11 @@ class PromptService:
         Example:
             >>> deleted = service.list_deleted_prompts(state)
         """
-        return state.get_deleted_prompts()
+        try:
+            return state.get_deleted_prompts()
+        except Exception as exc:
+            logger.exception("Failed to list deleted prompts")
+            raise DataPersistenceError(f"削除済みプロンプト取得に失敗しました: {exc}")
 
     def permanently_delete_prompt(self, state: AppState, prompt_id: str) -> None:
         """プロンプトを完全削除。
@@ -242,13 +288,19 @@ class PromptService:
         Example:
             >>> service.permanently_delete_prompt(state, "id123")
         """
-        prompt = self.get_prompt(state, prompt_id)
+        try:
+            prompt = self.get_prompt(state, prompt_id)
 
-        state.prompts.remove(prompt)
-        if prompt_id in state.trash:
-            state.trash.remove(prompt_id)
+            state.prompts.remove(prompt)
+            if prompt_id in state.trash:
+                state.trash.remove(prompt_id)
 
-        logger.info(f"Permanently deleted prompt: {prompt_id}")
+            logger.info("Permanently deleted prompt: %s", prompt_id)
+        except PromptNotFoundError:
+            raise
+        except Exception as exc:
+            logger.exception("Failed to permanently delete prompt: %s", prompt_id)
+            raise DataPersistenceError(f"プロンプトの完全削除に失敗しました: {exc}")
 
     def empty_trash(self, state: AppState) -> None:
         """ゴミ箱を空にする。
@@ -259,11 +311,15 @@ class PromptService:
         Example:
             >>> service.empty_trash(state)
         """
-        deleted_ids = state.trash.copy()
-        for prompt_id in deleted_ids:
-            self.permanently_delete_prompt(state, prompt_id)
+        try:
+            deleted_ids = state.trash.copy()
+            for prompt_id in deleted_ids:
+                self.permanently_delete_prompt(state, prompt_id)
 
-        logger.info(f"Emptied trash: {len(deleted_ids)} prompts")
+            logger.info("Emptied trash: %d prompts", len(deleted_ids))
+        except Exception as exc:
+            logger.exception("Failed to empty trash")
+            raise DataPersistenceError(f"ゴミ箱のクリアに失敗しました: {exc}")
 
     def toggle_favorite(self, state: AppState, prompt_id: str) -> None:
         """プロンプトのお気に入り状態をトグル。
@@ -278,7 +334,15 @@ class PromptService:
         Example:
             >>> service.toggle_favorite(state, "id123")
         """
-        prompt = self.get_prompt(state, prompt_id)
-        prompt.favorite = not prompt.favorite
-        prompt.updated_at = datetime.now()
-        logger.info(f"Toggled favorite for prompt: {prompt_id} -> {prompt.favorite}")
+        try:
+            prompt = self.get_prompt(state, prompt_id)
+            prompt.favorite = not prompt.favorite
+            prompt.updated_at = datetime.now()
+            logger.info(
+                "Toggled favorite for prompt: %s -> %s", prompt_id, prompt.favorite
+            )
+        except PromptNotFoundError:
+            raise
+        except Exception as exc:
+            logger.exception("Failed to toggle favorite: %s", prompt_id)
+            raise ValidationError(f"お気に入り更新に失敗しました: {exc}")

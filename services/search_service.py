@@ -27,11 +27,15 @@ class SearchService:
         Returns:
             検索条件に一致するプロンプト一覧。
         """
-        if not query:
-            return prompts
+        try:
+            if not query:
+                return prompts
 
-        q = query.lower()
-        return [p for p in prompts if q in p.title.lower() or q in p.body.lower()]
+            q = query.lower()
+            return [p for p in prompts if q in p.title.lower() or q in p.body.lower()]
+        except Exception as exc:
+            logger.exception("Failed to search prompts")
+            return []
 
     def filter_by_category(
         self, prompts: List[Prompt], category_path: List[str]
@@ -49,11 +53,15 @@ class SearchService:
         Returns:
             カテゴリ条件に一致するプロンプト一覧。
         """
-        if not category_path:
-            return prompts
+        try:
+            if not category_path:
+                return prompts
 
-        length = len(category_path)
-        return [p for p in prompts if p.category_path[:length] == category_path]
+            length = len(category_path)
+            return [p for p in prompts if p.category_path[:length] == category_path]
+        except Exception as exc:
+            logger.exception("Failed to filter by category")
+            return []
 
     def filter_by_favorite(self, prompts: List[Prompt]) -> List[Prompt]:
         """お気に入りフラグでフィルタする。
@@ -64,7 +72,11 @@ class SearchService:
         Returns:
             お気に入りフラグが立っているプロンプト一覧。
         """
-        return [p for p in prompts if p.favorite]
+        try:
+            return [p for p in prompts if p.favorite]
+        except Exception as exc:
+            logger.exception("Failed to filter by favorite")
+            return []
 
     def apply_filters(
         self,
@@ -86,9 +98,13 @@ class SearchService:
         Returns:
             フィルタ適用後のプロンプト一覧。
         """
-        filtered = self.search_prompts(prompts, query)
-        if category_path:
-            filtered = self.filter_by_category(filtered, category_path)
-        if favorite:
-            filtered = self.filter_by_favorite(filtered)
-        return filtered
+        try:
+            filtered = self.search_prompts(prompts, query)
+            if category_path:
+                filtered = self.filter_by_category(filtered, category_path)
+            if favorite:
+                filtered = self.filter_by_favorite(filtered)
+            return filtered
+        except Exception as exc:
+            logger.exception("Failed to apply filters")
+            return []

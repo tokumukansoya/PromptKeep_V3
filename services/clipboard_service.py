@@ -29,7 +29,7 @@ class ClipboardService:
             page.set_clipboard(text)
             return True
         except Exception as e:  # noqa: BLE001
-            logger.error("Failed to copy to clipboard: %s", e)
+            logger.exception("Failed to copy to clipboard")
             return False
 
     def get_clipboard_text(self, page: ft.Page) -> Optional[str]:
@@ -44,5 +44,5 @@ class ClipboardService:
         try:
             return page.get_clipboard()
         except Exception as e:  # noqa: BLE001
-            logger.error("Failed to get clipboard text: %s", e)
+            logger.exception("Failed to get clipboard text")
             return None

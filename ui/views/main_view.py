@@ -272,14 +272,23 @@ class MainView(ft.Row):
 
         編集ビューから カードグリッドビューに戻ります。
         """
-        # 編集ビューからカードグリッドへ戻る
-        self._state.current_editing_id = None
-        self._update_content()
+        try:
+            self._edit_controller.on_back(self._navigate_back_to_grid)
+        except Exception:
+            self._navigate_back_to_grid()
 
     def _handle_add_prompt(self, _: ft.ControlEvent) -> None:
         """新規プロンプト追加ボタンのハンドラ。"""
         self._main_controller.on_add_prompt(self._state)
         self._update_content()
+
+    def refresh(self) -> None:
+        """状態変更後にサイドバーとコンテンツを再構成する。"""
+        try:
+            self._refresh_sidebar()
+            self._update_content()
+        except Exception:
+            return
 
     def _update_content(self) -> None:
         """コンテンツエリアを再構成。
@@ -288,6 +297,11 @@ class MainView(ft.Row):
         """
         self._content_container.content = self._build_content()
         self._content_container.update()
+
+    def _navigate_back_to_grid(self) -> None:
+        """編集ビューからカードグリッドへ戻る内部ユーティリティ。"""
+        self._state.current_editing_id = None
+        self._update_content()
 
     def build(self) -> ft.Row:  # type: ignore[override]
         """Flet ビルド関数。

@@ -12,9 +12,11 @@ from services.prompt_service import PromptService
 from services.category_service import CategoryService
 from services.clipboard_service import ClipboardService
 from services.search_service import SearchService
+from services.undo_service import UndoService
 from ui.controllers.main_controller import MainController
 from ui.controllers.edit_controller import EditController
 from ui.controllers.category_controller import CategoryController
+from ui.controllers.keyboard_controller import KeyboardController
 from ui.views.main_view import MainView
 from ui.styles import colors
 
@@ -60,6 +62,7 @@ class PromptKeepApp:
         self._category_service = CategoryService(self._data_service)
         self._clipboard_service = ClipboardService()
         self._search_service = SearchService()
+        self._undo_service = UndoService()
 
         # AppState の読み込み
         self._state: AppState = self._data_service.load()
@@ -75,6 +78,7 @@ class PromptKeepApp:
             data_service=self._data_service,
             clipboard_service=self._clipboard_service,
             search_service=self._search_service,
+            undo_service=self._undo_service,
         )
         self._edit_controller = EditController(
             prompt_service=self._prompt_service, data_service=self._data_service
@@ -82,6 +86,7 @@ class PromptKeepApp:
         self._category_controller = CategoryController(
             category_service=self._category_service, data_service=self._data_service
         )
+        self._keyboard_controller: Optional[KeyboardController] = None
 
         logger.debug("PromptKeepApp initialized successfully")
 
@@ -144,6 +149,7 @@ class PromptKeepApp:
         # ============================================================================
         self._main_controller.attach_page(page)
         self._category_controller.attach_page(page)
+        self._edit_controller.attach_page(page)
 
         # ============================================================================
         # メインビューの生成と追加
@@ -158,6 +164,15 @@ class PromptKeepApp:
             )
             page.add(main_view)
             logger.info("Main view added to page")
+
+            self._keyboard_controller = KeyboardController(
+                page=page,
+                undo_handler=lambda: self._main_controller.undo_last_operation(
+                    self._state
+                ),
+                on_state_restored=lambda: self._refresh_ui(main_view),
+            )
+            self._keyboard_controller.setup_shortcuts()
         except Exception as e:
             logger.error(f"Failed to build main view: {e}")
             page.clean()
@@ -190,6 +205,13 @@ class PromptKeepApp:
             page.update()
         except Exception as e:
             logger.error(f"Failed to handle view change: {e}")
+
+    def _refresh_ui(self, main_view: MainView) -> None:
+        """アンドゥ適用後などに UI を再構成する。"""
+        try:
+            main_view.refresh()
+        except Exception as e:
+            logger.error(f"Failed to refresh UI after undo: {e}")
 
 
 def main() -> None:

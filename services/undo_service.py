@@ -48,12 +48,18 @@ class UndoService:
         Args:
             state: 現在のアプリケーション状態。
         """
-        snapshot = state.to_dict()
-        self._stack.append(snapshot)
-        # 余剰分を削る（直前のみ保持）
-        if len(self._stack) > self.max_stack_size:
-            self._stack = self._stack[-self.max_stack_size :]
-        logger.info("Pushed state snapshot (stack_size=%s)", len(self._stack))
+        try:
+            snapshot = state.to_dict()
+            self._stack.append(snapshot)
+            # 余剰分を削る（直前のみ保持）
+            if len(self._stack) > self.max_stack_size:
+                self._stack = self._stack[-self.max_stack_size :]
+            logger.info("Pushed state snapshot (stack_size=%s)", len(self._stack))
+        except Exception as exc:
+            logger.exception("Failed to push state snapshot")
+            raise RuntimeError(
+                f"アンドゥ用スナップショットの保存に失敗しました: {exc}"
+            ) from exc
 
     def can_undo(self) -> bool:
         """アンドゥ可能かどうかを返す。
@@ -72,11 +78,21 @@ class UndoService:
         if not self._stack:
             logger.error("Undo requested but stack is empty")
             return None
-        snapshot = self._stack.pop()
-        logger.info("Undo performed (remaining_stack=%s)", len(self._stack))
-        return snapshot
+        try:
+            snapshot = self._stack.pop()
+            logger.info("Undo performed (remaining_stack=%s)", len(self._stack))
+            return snapshot
+        except Exception as exc:
+            logger.exception("Failed to pop undo snapshot")
+            raise RuntimeError(f"アンドゥ処理に失敗しました: {exc}") from exc
 
     def clear(self) -> None:
         """スタックをクリアする。"""
-        self._stack.clear()
-        logger.info("Undo stack cleared")
+        try:
+            self._stack.clear()
+            logger.info("Undo stack cleared")
+        except Exception as exc:
+            logger.exception("Failed to clear undo stack")
+            raise RuntimeError(
+                f"アンドゥスタックのクリアに失敗しました: {exc}"
+            ) from exc

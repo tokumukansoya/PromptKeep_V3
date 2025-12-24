@@ -1,11 +1,10 @@
 from __future__ import annotations
 
 import logging
-from typing import Optional
+from typing import Callable, Optional, Tuple
 
 import flet as ft
 
-from services.undo_service import UndoService
 from ui.components.common.snackbar import show_snackbar
 from ui.styles.colors import SUCCESS_COLOR, ERROR_COLOR
 
@@ -16,28 +15,36 @@ class KeyboardController:
     """キーボードショートカット管理コントローラー。
 
     Page のキーボードイベントを監視し、ショートカット操作をハンドリングする。
-    現状は Ctrl+Z により `UndoService.undo()` を呼び出す。
+    現状は Ctrl+Z により "直前に保存したスナップショットを適用する" ハンドラーを呼び出す。
 
     Flet 0.28.3 の KeyboardEvent API に準拠。
 
     Args:
         page: Flet の `Page` インスタンス。
-        undo_service: アンドゥ管理の `UndoService`。
+        undo_handler: アンドゥ処理を実行するコールバック（成功/失敗メッセージ付き）。
 
     Attributes:
         _page: 関連付けられた `ft.Page`。
-        _undo_service: `UndoService` の参照。
+        _undo_handler: アンドゥ処理の実装を受け取るコールバック。
+        _on_state_restored: UI 更新コールバック（任意）。
     """
 
-    def __init__(self, page: ft.Page, undo_service: UndoService) -> None:
+    def __init__(
+        self,
+        page: ft.Page,
+        undo_handler: Callable[[], Tuple[bool, str]],
+        on_state_restored: Optional[Callable[[], None]] = None,
+    ) -> None:
         """初期化。
 
         Args:
             page: Flet の `Page`。
-            undo_service: アンドゥ管理の `UndoService`。
+            undo_handler: アンドゥ処理を実行するコールバック。
+            on_state_restored: アンドゥ適用後に UI を更新するコールバック。
         """
         self._page: ft.Page = page
-        self._undo_service: UndoService = undo_service
+        self._undo_handler: Callable[[], Tuple[bool, str]] = undo_handler
+        self._on_state_restored: Optional[Callable[[], None]] = on_state_restored
         logger.debug("KeyboardController initialized")
 
     def setup_shortcuts(self) -> None:
@@ -72,21 +79,22 @@ class KeyboardController:
 
             # Ctrl+Z / Cmd+Z => Undo
             if key == "z" and is_ctrl_or_cmd:
-                snapshot = self._undo_service.undo()
-                if snapshot is None:
-                    show_snackbar(
-                        self._page, "元に戻せる操作がありません", bgcolor=ERROR_COLOR
-                    )
-                    logger.warning("Undo requested but nothing to undo")
-                    return
-
-                # ここでは snapshot を呼び出し側で適用する設計（Phase 2-2 仕様）
-                show_snackbar(self._page, "元に戻しました", bgcolor=SUCCESS_COLOR)
-                logger.info("Undo executed via keyboard shortcut (Ctrl+Z/Cmd+Z)")
-
-                # 呼び出し側が snapshot を取得して適用できるように、ページのセッションに一時保存する選択肢もある。
-                # ただし本実装では副作用を避け、通知のみ行う。
+                success, message = self._undo_handler()
+                if success:
+                    if self._on_state_restored:
+                        self._on_state_restored()
+                    show_snackbar(self._page, message, bgcolor=SUCCESS_COLOR)
+                    logger.info("Undo executed via keyboard shortcut (Ctrl+Z/Cmd+Z)")
+                else:
+                    show_snackbar(self._page, message, bgcolor=ERROR_COLOR)
+                    logger.warning("Undo request could not be completed: %s", message)
 
         except Exception as ex:
-            logger.error(f"Failed to handle keyboard event: {ex}")
-            # 重大ではないため UI 通知は控えめにとどめる
+            logger.exception("Failed to handle keyboard event")
+            # 重大ではないため UI 通知は控えめにとどめるが、明示的に通知する
+            if self._page:
+                show_snackbar(
+                    self._page,
+                    "キーボード操作の処理に失敗しました",
+                    bgcolor=ERROR_COLOR,
+                )

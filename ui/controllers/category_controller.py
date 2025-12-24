@@ -55,7 +55,7 @@ class CategoryController:
             self._category_service.create_category(
                 state, name=name, parent_id=parent_id
             )
-            self._data_service.save(state)
+            self._save_with_recovery(state)
             logger.info("Category added: name=%s parent=%s", name, parent_id)
         except InvalidCategoryDepthError as e:
             logger.error("Invalid category depth on add: %s", e)
@@ -88,7 +88,7 @@ class CategoryController:
             self._category_service.move_category(
                 state, category_id=category_id, new_parent_id=new_parent_id
             )
-            self._data_service.save(state)
+            self._save_with_recovery(state)
             logger.info(
                 "Category moved: id=%s new_parent=%s", category_id, new_parent_id
             )
@@ -116,7 +116,7 @@ class CategoryController:
         """
         try:
             self._category_service.delete_category(state, category_id=category_id)
-            self._data_service.save(state)
+            self._save_with_recovery(state)
             logger.info("Category deleted: id=%s", category_id)
         except CategoryNotFoundError as e:
             logger.error("Category not found on delete: %s", e)
@@ -140,7 +140,7 @@ class CategoryController:
         """
         try:
             state.selected_category_id = category_id
-            self._data_service.save(state)
+            self._save_with_recovery(state)
             logger.info("Category selected: id=%s", category_id)
         except Exception as e:
             logger.error("Failed to select category '%s': %s", category_id, e)
@@ -148,3 +148,34 @@ class CategoryController:
                 show_snackbar(
                     self._page, "カテゴリ選択に失敗しました", bgcolor=ERROR_COLOR
                 )
+
+    def _save_with_recovery(self, state: AppState) -> None:
+        """状態保存を実行し、失敗時はバックアップ復元を試みる。
+
+        Args:
+            state: 保存対象のアプリケーション状態。
+        """
+        try:
+            self._data_service.save(state)
+        except Exception as exc:
+            logger.exception("Failed to persist state in CategoryController")
+            restored = False
+            try:
+                restored = self._data_service.restore_from_backup()
+            except Exception:
+                logger.exception("Restore from backup failed in CategoryController")
+
+            if self._page:
+                if restored:
+                    show_snackbar(
+                        self._page,
+                        "保存に失敗しましたがバックアップから復元しました",
+                        bgcolor=ERROR_COLOR,
+                    )
+                else:
+                    show_snackbar(
+                        self._page,
+                        "保存に失敗しました。バックアップ復元も失敗しました",
+                        bgcolor=ERROR_COLOR,
+                    )
+            raise

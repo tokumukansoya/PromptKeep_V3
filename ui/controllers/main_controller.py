@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import logging
-from typing import Callable, List, Optional
+from typing import Callable, List, Optional, Tuple
 
 import flet as ft
 
@@ -12,6 +12,7 @@ from services.category_service import CategoryService
 from services.data_service import DataService
 from services.clipboard_service import ClipboardService
 from services.search_service import SearchService
+from services.undo_service import UndoService
 from exceptions import PromptNotFoundError, CategoryNotFoundError
 from ui.components.common.snackbar import show_snackbar
 from ui.styles.colors import ERROR_COLOR, SUCCESS_COLOR
@@ -49,6 +50,7 @@ class MainController:
         data_service: DataService,
         clipboard_service: ClipboardService,
         search_service: Optional[SearchService] = None,
+        undo_service: Optional[UndoService] = None,
     ) -> None:
         """MainController の初期化。
 
@@ -64,6 +66,7 @@ class MainController:
         self._data_service = data_service
         self._clipboard_service = clipboard_service
         self._search_service = search_service or SearchService()
+        self._undo_service = undo_service
         self._page: Optional[ft.Page] = None
         logger.debug("MainController initialized")
 
@@ -104,7 +107,7 @@ class MainController:
             )
             state.prompts.append(prompt)
             state.current_editing_id = prompt.id
-            self._data_service.save(state)
+            self._save_with_recovery(state)
             logger.info(f"New prompt added: {prompt.id}")
         except Exception as e:
             logger.error(f"Failed to add prompt: {e}")
@@ -153,11 +156,18 @@ class MainController:
             None
         """
         try:
+            if self._undo_service:
+                try:
+                    self._undo_service.push_state(state)
+                except Exception as snapshot_err:
+                    logger.warning(
+                        "Failed to push undo snapshot before delete: %s", snapshot_err
+                    )
             self._prompt_service.delete_prompt(state, prompt_id)
             # 編集中だった場合は編集ビューから脱出
             if state.current_editing_id == prompt_id:
                 state.current_editing_id = None
-            self._data_service.save(state)
+            self._save_with_recovery(state)
             logger.info(f"Prompt deleted: {prompt_id}")
             if self._page:
                 show_snackbar(
@@ -173,6 +183,35 @@ class MainController:
                 show_snackbar(
                     self._page, "プロンプトの削除に失敗しました", bgcolor=ERROR_COLOR
                 )
+
+    def undo_last_operation(self, state: AppState) -> Tuple[bool, str]:
+        """UndoService から直前のスナップショットを適用する。"""
+
+        if not self._undo_service:
+            logger.warning("Undo service is not configured")
+            return False, "アンドゥ機能が利用できません"
+
+        try:
+            snapshot = self._undo_service.undo()
+            if snapshot is None:
+                logger.info("Undo requested but stack is empty")
+                return False, "元に戻せる操作がありません"
+
+            restored = AppState.from_dict(snapshot)
+
+            state.prompts = restored.prompts
+            state.categories = restored.categories
+            state.trash = restored.trash
+            state.selected_category_id = restored.selected_category_id
+            state.search_query = restored.search_query
+            state.current_editing_id = restored.current_editing_id
+
+            self._save_with_recovery(state)
+            logger.info("State restored from undo snapshot")
+            return True, "元に戻しました"
+        except Exception as exc:
+            logger.exception("Failed to apply undo snapshot")
+            return False, "元に戻し処理に失敗しました"
 
     def on_copy_prompt(self, page: ft.Page, prompt: Prompt) -> None:
         """プロンプト本文をクリップボードにコピーする。
@@ -212,7 +251,7 @@ class MainController:
         """
         try:
             self._prompt_service.toggle_favorite(state, prompt_id)
-            self._data_service.save(state)
+            self._save_with_recovery(state)
             prompt = self._prompt_service.get_prompt(state, prompt_id)
             status = (
                 "お気に入りに追加しました"
@@ -364,3 +403,38 @@ class MainController:
         # ルート -> 選択 の順に並べ替え
         path.reverse()
         return path
+
+    def _save_with_recovery(self, state: AppState) -> None:
+        """状態保存を実行し、失敗時はバックアップ復元を試みる。
+
+        Args:
+            state: 保存対象のアプリケーション状態。
+
+        Raises:
+            DataPersistenceError: 保存および復元に失敗した場合。
+        """
+        try:
+            self._data_service.save(state)
+        except Exception as exc:
+            logger.exception("Failed to persist state; attempting recovery")
+            restored = False
+            try:
+                restored = self._data_service.restore_from_backup()
+            except Exception:
+                logger.exception("Restore from backup failed")
+
+            if self._page:
+                if restored:
+                    show_snackbar(
+                        self._page,
+                        "保存に失敗しましたがバックアップから復元しました",
+                        bgcolor=ERROR_COLOR,
+                    )
+                else:
+                    show_snackbar(
+                        self._page,
+                        "保存に失敗しました。バックアップ復元も失敗しました",
+                        bgcolor=ERROR_COLOR,
+                    )
+            # もとの例外を上位に伝搬（必要に応じて呼び出し側で処理）
+            raise
