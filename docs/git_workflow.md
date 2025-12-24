@@ -445,5 +445,24 @@ Phase 完成時の確認：
 - [ ] Phase ブランチ削除済み（オプション）
 
 ---
+ 
+**次のステップ:** Phase 2（残りサービス）を完了してから Phase 4 に着手
 
-**次のステップ:** Phase 4 の実装を開始しましょう！
+推奨の進め方（コマンド例）:
+
+```bash
+# Phase 2 の残りサービスを実装するブランチを作成
+git checkout main
+git checkout -b phase-2-services
+
+# 実装順の目安：CategoryService → UndoService → ClipboardService → SearchService
+# 各コンポーネントごとに小まめにコミット
+
+# Phase 2 完了後に main へ統合
+git checkout main
+git merge phase-2-services --no-ff -m "Merge phase-2-services: Phase 2 完了"
+git tag phase-2-complete -m "Phase 2: サービス層が完成"
+
+# 続いて Phase 4（カードUI）へ
+git checkout -b phase-4-card-ui
+```
