@@ -73,15 +73,12 @@ def main() -> None:
     # ここから UI 層のインポートと初期化
     logger.info("Initializing application...")
 
-    # TODO: UI 層の実装が完成したら以下をアンコメント
-    # from ui.app import PromptKeepApp
-    # app = PromptKeepApp()
-    # app.run()
+    from ui.app import PromptKeepApp
 
-    logger.info("PromptKeep Application initialized")
-    logger.info("UI implementation pending...")
-    print("\n✓ PromptKeep is ready for UI implementation!")
-    print("✓ Current status: Data layer and services are ready.")
+    app = PromptKeepApp()
+    app.run()
+
+    logger.info("PromptKeep Application terminated normally")
 
 
 if __name__ == "__main__":
