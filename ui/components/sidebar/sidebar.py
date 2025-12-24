@@ -30,8 +30,10 @@ class Sidebar(ft.Column):
         categories: List[Category],
         on_search: Callable[[str], None],
         on_category_select: Callable[[Category], None],
+        on_clear_selection: Callable[[], None],
         on_category_add: Callable[[], None],
         on_category_move: Callable[[str, str], None],
+        initial_query: str = "",
     ) -> None:
         """初期化。"""
         super().__init__()
@@ -39,11 +41,21 @@ class Sidebar(ft.Column):
         self._categories: List[Category] = categories
         self._on_search: Callable[[str], None] = on_search
         self._on_category_select: Callable[[Category], None] = on_category_select
+        self._on_clear_selection: Callable[[], None] = on_clear_selection
         self._on_category_add: Callable[[], None] = on_category_add
         self._on_category_move: Callable[[str, str], None] = on_category_move
+        self._initial_query = initial_query
 
         # 上部：検索ボックス（デバウンスは SearchBox 内で実施）
-        search_box = SearchBox(on_search=self._on_search)
+        self._search_box = SearchBox(on_search=self._on_search)
+        if self._initial_query:
+            self._search_box.value = self._initial_query
+
+        # 全カテゴリ表示に戻すショートカット
+        clear_button = ft.TextButton(
+            text="すべて",
+            on_click=lambda _: self._on_clear_selection(),
+        )
 
         # 中央：カテゴリツリー
         category_tree = CategoryTree(
@@ -58,7 +70,11 @@ class Sidebar(ft.Column):
         # レイアウト構成
         self.controls = [
             ft.Container(
-                content=search_box, padding=ft.padding.only(bottom=spacing.GAP_MD)
+                content=self._search_box,
+                padding=ft.padding.only(bottom=spacing.GAP_SM),
+            ),
+            ft.Container(
+                content=clear_button, padding=ft.padding.only(bottom=spacing.GAP_MD)
             ),
             ft.Container(content=category_tree, expand=True),
             ft.Container(
@@ -67,6 +83,15 @@ class Sidebar(ft.Column):
         ]
         self.spacing = spacing.GAP_MD
         self.tight = True
+
+    # 外部から検索をリセットしたい場合に呼び出す
+    def clear_search(self) -> None:
+        try:
+            self._search_box.value = ""
+            self._search_box.update()
+            self._on_search("")
+        except Exception:
+            return
 
     def build(self) -> ft.Column:  # type: ignore[override]
         """Flet ビルド関数。

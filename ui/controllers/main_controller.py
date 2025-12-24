@@ -97,13 +97,11 @@ class MainController:
         """
         try:
             # デフォルト値でプロンプト作成
-            category_path = (
-                state.selected_category_id if state.selected_category_id else []
-            )
+            category_path = self._resolve_selected_category_path(state)
             prompt = self._prompt_service.create_prompt(
                 title="",
                 body="",
-                category_path=category_path if isinstance(category_path, list) else [],
+                category_path=category_path,
             )
             state.prompts.append(prompt)
             state.current_editing_id = prompt.id
@@ -340,6 +338,11 @@ class MainController:
             if self._page:
                 show_snackbar(self._page, "検索に失敗しました", bgcolor=ERROR_COLOR)
 
+    def clear_filters(self, state: AppState) -> None:
+        """検索とカテゴリ選択をリセットする。"""
+        state.search_query = ""
+        state.selected_category_id = None
+
     def get_filtered_prompts(
         self,
         state: AppState,
@@ -370,6 +373,26 @@ class MainController:
                 category_path=category_path if category_path else None,
                 favorite=include_favorite,
             )
+
+            if (
+                not result
+                and prompts
+                and (state.search_query or state.selected_category_id)
+            ):
+                # フィルタで0件なら、自動的にフィルタをリセットして全件表示
+                logger.info("Filters cleared automatically because no prompts matched")
+                state.search_query = ""
+                state.selected_category_id = None
+                result = self._search_service.apply_filters(
+                    prompts,
+                    query=state.search_query,
+                    category_path=None,
+                    favorite=include_favorite,
+                )
+                if self._page:
+                    show_snackbar(
+                        self._page, "フィルタをリセットしました", bgcolor=SUCCESS_COLOR
+                    )
             return result
         except Exception as e:
             logger.error(f"Failed to get filtered prompts: {e}")

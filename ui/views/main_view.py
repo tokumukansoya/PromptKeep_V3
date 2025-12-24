@@ -58,13 +58,19 @@ class MainView(ft.Row):
         self._category_controller: Optional[CategoryController] = category_controller
         self._on_view_change: Callable[[], None] = on_view_change
 
+        # 起動時にフィルタをクリアし、最低1件の編集対象を用意
+        self._main_controller.clear_filters(self._state)
+        self._ensure_prompt_exists()
+
         # サイドバーの生成
         self._sidebar: Sidebar = Sidebar(
             categories=self._state.categories,
             on_search=self._handle_search,
             on_category_select=self._handle_category_select,
+            on_clear_selection=self._handle_clear_selection,
             on_category_add=self._handle_category_add,
             on_category_move=self._handle_category_move,
+            initial_query=self._state.search_query,
         )
         self._sidebar_container = ft.Container(
             content=self._sidebar,
@@ -106,8 +112,10 @@ class MainView(ft.Row):
                 categories=self._state.categories,
                 on_search=self._handle_search,
                 on_category_select=self._handle_category_select,
+                on_clear_selection=self._handle_clear_selection,
                 on_category_add=self._handle_category_add,
                 on_category_move=self._handle_category_move,
+                initial_query=self._state.search_query,
             )
             self._sidebar_container.content = self._sidebar
             self._sidebar_container.update()
@@ -185,6 +193,15 @@ class MainView(ft.Row):
             category: 選択されたカテゴリ。
         """
         self._main_controller.on_category_change(self._state, category.id)
+        self._update_content()
+
+    def _handle_clear_selection(self) -> None:
+        """カテゴリ選択を全解除する。"""
+        try:
+            self._sidebar.clear_search()
+        except Exception:
+            pass
+        self._main_controller.clear_filters(self._state)
         self._update_content()
 
     def _handle_category_add(self) -> None:
@@ -279,6 +296,11 @@ class MainView(ft.Row):
 
     def _handle_add_prompt(self, _: ft.ControlEvent) -> None:
         """新規プロンプト追加ボタンのハンドラ。"""
+        try:
+            self._sidebar.clear_search()
+        except Exception:
+            pass
+        self._main_controller.clear_filters(self._state)
         self._main_controller.on_add_prompt(self._state)
         self._update_content()
 
@@ -297,6 +319,11 @@ class MainView(ft.Row):
         """
         self._content_container.content = self._build_content()
         self._content_container.update()
+        if self.page:
+            try:
+                self.page.update()
+            except Exception:
+                pass
 
     def _navigate_back_to_grid(self) -> None:
         """編集ビューからカードグリッドへ戻る内部ユーティリティ。"""
@@ -310,3 +337,13 @@ class MainView(ft.Row):
             ft.Row: 自身のインスタンスを返します。
         """
         return self
+
+    # ------------------------------------------------------------------
+    # helpers
+    # ------------------------------------------------------------------
+    def _ensure_prompt_exists(self) -> None:
+        """初回起動時、プロンプトが1件もない場合にダミーを作成して編集状態にする。"""
+        if self._state.prompts:
+            return
+        self._main_controller.on_add_prompt(self._state)
+        self._update_content()
