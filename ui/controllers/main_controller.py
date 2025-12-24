@@ -265,9 +265,11 @@ class MainController:
                 )
 
     def on_search(self, state: AppState, query: str) -> None:
-        """検索クエリを更新する。
+        """検索クエリを更新し、検索サービスで結果を評価する。
 
-        タイトルと本文を対象に検索。
+        タイトルと本文を対象に部分一致検索を行う。UI 側では
+        `get_filtered_prompts()` を介して結果が反映されるが、ここでは
+        `SearchService` を用いて結果件数を評価・ログ記録する。
 
         Args:
             state: 現在のアプリケーション状態。
@@ -277,12 +279,23 @@ class MainController:
             None
 
         Note:
-            - 検索は SearchService で実行。
-            - 複合フィルタ（カテゴリ + 検索）は呼び出し側で適用。
+            - Flet 0.28.3 API 準拠。
+            - 検索 + （カテゴリ／お気に入り）複合フィルタは
+              `get_filtered_prompts()` で最終適用される。
         """
         try:
             state.search_query = query
-            logger.info(f"Search query updated: {query}")
+
+            # 事前に検索結果を評価（件数ログ）。実際の描画は呼び出し側で行う。
+            base_prompts = self._prompt_service.list_active_prompts(state)
+            category_path = self._resolve_selected_category_path(state)
+            preview = self._search_service.apply_filters(
+                base_prompts,
+                query=query,
+                category_path=category_path if category_path else None,
+                favorite=False,
+            )
+            logger.info("Search updated: query='%s', matched=%d", query, len(preview))
         except Exception as e:
             logger.error(f"Failed to update search query: {e}")
             if self._page:
@@ -308,14 +321,10 @@ class MainController:
             # ゴミ箱内を除外
             prompts = self._prompt_service.list_active_prompts(state)
 
-            # カテゴリフィルタ
-            category_path = []
-            if state.selected_category_id:
-                # カテゴリ ID からパスを取得（実装例）
-                # 実装詳細はカテゴリツリー操作に依存
-                pass
+            # カテゴリ ID -> カテゴリ名のパス（前方一致用）へ解決
+            category_path = self._resolve_selected_category_path(state)
 
-            # 複合フィルタ適用
+            # 複合フィルタ適用（検索 + カテゴリ + お気に入り）
             result = self._search_service.apply_filters(
                 prompts,
                 query=state.search_query,
@@ -326,3 +335,32 @@ class MainController:
         except Exception as e:
             logger.error(f"Failed to get filtered prompts: {e}")
             return []
+
+    # ------------------------------------------------------------------
+    # helpers
+    # ------------------------------------------------------------------
+    def _resolve_selected_category_path(self, state: AppState) -> List[str]:
+        """選択カテゴリ ID を名称パス（ルートからの名前配列）へ解決する。
+
+        `Prompt.category_path` は名称配列で保持しているため、
+        前方一致フィルタに利用できるように選択カテゴリの名称パスを生成する。
+
+        Args:
+            state: 現在のアプリケーション状態。
+
+        Returns:
+            ルートから選択カテゴリまでの名称配列。未選択のときは空配列。
+        """
+        if not state.selected_category_id:
+            return []
+        path: List[str] = []
+        current = state.get_category(state.selected_category_id)
+        # 親を辿って名称を収集
+        while current is not None:
+            path.append(current.name)
+            if current.parent_id is None:
+                break
+            current = state.get_category(current.parent_id)
+        # ルート -> 選択 の順に並べ替え
+        path.reverse()
+        return path
