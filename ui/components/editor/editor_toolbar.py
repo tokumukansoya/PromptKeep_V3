@@ -20,7 +20,7 @@ class EditorToolbar(ft.Row):
         self._on_back: Callable[[], None] = on_back
 
         back_button = ft.IconButton(
-            icon=ft.icons.ARROW_BACK_IOS_NEW_ROUNDED,
+            icon="arrow_back_ios_new_rounded",
             tooltip="戻る",
             icon_color=colors.TEXT_PRIMARY,
             icon_size=spacing.ICON_SIZE,
@@ -30,7 +30,7 @@ class EditorToolbar(ft.Row):
         autosave_status = ft.Row(
             controls=[
                 ft.Icon(
-                    name=ft.icons.SAVE_ALT_ROUNDED,
+                    name="save_alt_rounded",
                     size=spacing.ICON_SIZE,
                     color=colors.TEXT_SECONDARY,
                 ),

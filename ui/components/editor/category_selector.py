@@ -56,7 +56,8 @@ class CategorySelector(ft.Dropdown):
             path_parts = build_path(cat)
             display = " > ".join(path_parts)
             value = self._path_to_value(path_parts)
-            options.append(ft.dropdown.Option(text=display, key=value, value=value))
+            # Dropdown Option には value 引数は存在しないため key に統一
+            options.append(ft.dropdown.Option(text=display, key=value))
         return options
 
     def _path_to_value(self, path: List[str]) -> str:
