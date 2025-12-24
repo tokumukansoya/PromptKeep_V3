@@ -26,7 +26,7 @@ class SearchBox(ft.TextField):
         """
         super().__init__(
             label="検索",
-            prefix_icon=ft.icons.SEARCH,
+            prefix_icon="search",
         )
         self._on_search: Callable[[str], None] = on_search
         self._debounce_timer: Optional[threading.Timer] = None

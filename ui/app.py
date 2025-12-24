@@ -13,6 +13,8 @@ from services.category_service import CategoryService
 from services.clipboard_service import ClipboardService
 from services.search_service import SearchService
 from ui.controllers.main_controller import MainController
+from ui.controllers.edit_controller import EditController
+from ui.controllers.category_controller import CategoryController
 from ui.views.main_view import MainView
 from ui.styles import colors
 
@@ -66,13 +68,19 @@ class PromptKeepApp:
             f"{len(self._state.categories)} categories"
         )
 
-        # メインコントローラーの生成
+        # コントローラー生成
         self._main_controller = MainController(
             prompt_service=self._prompt_service,
             category_service=self._category_service,
             data_service=self._data_service,
             clipboard_service=self._clipboard_service,
             search_service=self._search_service,
+        )
+        self._edit_controller = EditController(
+            prompt_service=self._prompt_service, data_service=self._data_service
+        )
+        self._category_controller = CategoryController(
+            category_service=self._category_service, data_service=self._data_service
         )
 
         logger.debug("PromptKeepApp initialized successfully")
@@ -135,6 +143,7 @@ class PromptKeepApp:
         # コントローラーの Page 関連付け
         # ============================================================================
         self._main_controller.attach_page(page)
+        self._category_controller.attach_page(page)
 
         # ============================================================================
         # メインビューの生成と追加
@@ -142,6 +151,9 @@ class PromptKeepApp:
         try:
             main_view = MainView(
                 state=self._state,
+                main_controller=self._main_controller,
+                edit_controller=self._edit_controller,
+                category_controller=self._category_controller,
                 on_view_change=lambda: self._on_view_changed(page, main_view),
             )
             page.add(main_view)

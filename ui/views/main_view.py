@@ -10,6 +10,9 @@ from ui.components.sidebar.sidebar import Sidebar
 from ui.styles import colors, spacing
 from ui.views.card_grid_view import CardGridView
 from ui.views.edit_view import EditView
+from ui.controllers.main_controller import MainController
+from ui.controllers.edit_controller import EditController
+from ui.controllers.category_controller import CategoryController
 
 
 class MainView(ft.Row):
@@ -36,6 +39,9 @@ class MainView(ft.Row):
     def __init__(
         self,
         state: AppState,
+        main_controller: MainController,
+        edit_controller: EditController,
+        category_controller: Optional[CategoryController],
         on_view_change: Callable[[], None],
     ) -> None:
         """初期化。
@@ -47,6 +53,9 @@ class MainView(ft.Row):
         super().__init__()
 
         self._state: AppState = state
+        self._main_controller: MainController = main_controller
+        self._edit_controller: EditController = edit_controller
+        self._category_controller: Optional[CategoryController] = category_controller
         self._on_view_change: Callable[[], None] = on_view_change
 
         # サイドバーの生成
@@ -57,6 +66,12 @@ class MainView(ft.Row):
             on_category_add=self._handle_category_add,
             on_category_move=self._handle_category_move,
         )
+        self._sidebar_container = ft.Container(
+            content=self._sidebar,
+            width=300,  # サイドバー固定幅：20-30% を想定
+            padding=spacing.GAP_MD,
+            bgcolor=colors.DARK_BG_SECONDARY,
+        )
 
         # コンテンツエリア（CardGridView または EditView をここに配置）
         self._content_container: ft.Container = ft.Container(
@@ -64,18 +79,40 @@ class MainView(ft.Row):
             content=self._build_content(),
         )
 
+        # 右下に新規プロンプト追加ボタン（Floating Action）
+        add_prompt_button = ft.FloatingActionButton(
+            icon="add",
+            tooltip="新規プロンプト",
+            on_click=self._handle_add_prompt,
+        )
+        floating_add = ft.Container(
+            content=add_prompt_button,
+            alignment=ft.alignment.bottom_right,
+            padding=spacing.GAP_MD,
+        )
+
         # Row レイアウト：左 (Sidebar 20-30%) | 右 (Content 70-80%)
         self.controls = [
-            ft.Container(
-                content=self._sidebar,
-                width=300,  # サイドバー固定幅：20-30% を想定
-                padding=spacing.GAP_MD,
-                bgcolor=colors.DARK_BG_SECONDARY,
-            ),
-            self._content_container,
+            self._sidebar_container,
+            ft.Stack(controls=[self._content_container, floating_add], expand=True),
         ]
         self.spacing = 0
         self.expand = True
+
+    def _refresh_sidebar(self) -> None:
+        """サイドバーを最新の状態で再構築して更新する。"""
+        try:
+            self._sidebar = Sidebar(
+                categories=self._state.categories,
+                on_search=self._handle_search,
+                on_category_select=self._handle_category_select,
+                on_category_add=self._handle_category_add,
+                on_category_move=self._handle_category_move,
+            )
+            self._sidebar_container.content = self._sidebar
+            self._sidebar_container.update()
+        except Exception:
+            return
 
     def _build_content(self) -> ft.Control:
         """編集状態に応じてコンテンツビューを生成。
@@ -115,19 +152,8 @@ class MainView(ft.Row):
         Returns:
             list: フィルタリング済みのプロンプト一覧。
         """
-        # ここでは簡略版：実際の実装は SearchService などを使用
-        prompts = self._state.prompts
-        # ゴミ箱内のプロンプトは除外
-        prompts = [p for p in prompts if p.id not in self._state.trash]
-        # カテゴリフィルタ（実装例）
-        if self._state.selected_category_id is not None:
-            # selected_category_id に基づいてフィルタ（簡略版）
-            pass
-        # 検索クエリフィルタ（実装例）
-        if self._state.search_query:
-            # search_query に基づいてフィルタ（簡略版）
-            pass
-        return prompts
+        # MainController のフィルタリングを使用
+        return self._main_controller.get_filtered_prompts(self._state)
 
     def _find_prompt_by_id(self, prompt_id: str) -> Optional[Prompt]:
         """プロンプト ID からプロンプトを検索。
@@ -149,9 +175,7 @@ class MainView(ft.Row):
         Args:
             query: 検索クエリ。
         """
-        # 状態を更新（実装詳細はコントローラーで処理）
-        # self._state.search_query = query
-        # コンテンツを再生成
+        self._main_controller.on_search(self._state, query)
         self._update_content()
 
     def _handle_category_select(self, category) -> None:
@@ -160,17 +184,27 @@ class MainView(ft.Row):
         Args:
             category: 選択されたカテゴリ。
         """
-        # 状態を更新（実装詳細はコントローラーで処理）
-        # self._state.selected_category_id = category.id
-        # コンテンツを再生成
+        self._main_controller.on_category_change(self._state, category.id)
         self._update_content()
 
     def _handle_category_add(self) -> None:
         """カテゴリ追加ボタンクリック時をハンドル。
 
         実装詳細はコントローラーで処理。
+        現状はデフォルト名で追加。
         """
-        pass
+        try:
+            if self._category_controller:
+                # デフォルト名で現在選択カテゴリ配下に追加
+                parent_id = self._state.selected_category_id
+                self._category_controller.on_add_category(
+                    self._state, name="新規カテゴリ", parent_id=parent_id
+                )
+                self._refresh_sidebar()
+                self._update_content()
+        except Exception:
+            # 失敗時は無視（Snackbar はコントローラー側で表示）
+            return
 
     def _handle_category_move(self, source_id: str, target_parent_id: str) -> None:
         """カテゴリ移動（DnD）時をハンドル。
@@ -180,7 +214,8 @@ class MainView(ft.Row):
             target_parent_id: 移動先親カテゴリ ID。
         """
         # 実装詳細はコントローラーで処理
-        pass
+        # TODO: CategoryController に対応するメソッドを実装後に接続
+        return
 
     def _handle_card_click(self, e: ft.ControlEvent, prompt: Prompt) -> None:
         """カードクリック時をハンドル。
@@ -189,9 +224,7 @@ class MainView(ft.Row):
             e: Flet イベント。
             prompt: クリックされたプロンプト。
         """
-        # 状態を更新（実装詳細はコントローラーで処理）
-        # self._state.current_editing_id = prompt.id
-        # ビューを切り替え
+        self._main_controller.on_card_click(self._state, prompt.id)
         self._update_content()
 
     def _handle_copy(self, e: ft.ControlEvent, prompt: Prompt) -> None:
@@ -201,8 +234,8 @@ class MainView(ft.Row):
             e: Flet イベント。
             prompt: コピー対象のプロンプト。
         """
-        # 実装詳細はコントローラーで処理
-        pass
+        if self.page:
+            self._main_controller.on_copy_prompt(self.page, prompt)
 
     def _handle_toggle_favorite(self, e: ft.ControlEvent, prompt: Prompt) -> None:
         """お気に入りトグル時をハンドル。
@@ -211,8 +244,8 @@ class MainView(ft.Row):
             e: Flet イベント。
             prompt: トグル対象のプロンプト。
         """
-        # 実装詳細はコントローラーで処理
-        pass
+        self._main_controller.on_toggle_favorite(self._state, prompt.id)
+        self._update_content()
 
     def _handle_save(self, title: str, body: str, category_path: list) -> None:
         """EditView からの保存をハンドル。
@@ -222,17 +255,30 @@ class MainView(ft.Row):
             body: 編集後の本文。
             category_path: 編集後のカテゴリパス。
         """
-        # 実装詳細はコントローラーで処理
-        pass
+        try:
+            if self._state.current_editing_id:
+                self._edit_controller.on_save(
+                    self._state,
+                    self._state.current_editing_id,
+                    title,
+                    body,
+                    category_path,
+                )
+        except Exception:
+            return
 
     def _handle_back(self) -> None:
         """EditView からの戻るボタンをハンドル。
 
         編集ビューから カードグリッドビューに戻ります。
         """
-        # 状態を更新（実装詳細はコントローラーで処理）
-        # self._state.current_editing_id = None
-        # ビューを切り替え
+        # 編集ビューからカードグリッドへ戻る
+        self._state.current_editing_id = None
+        self._update_content()
+
+    def _handle_add_prompt(self, _: ft.ControlEvent) -> None:
+        """新規プロンプト追加ボタンのハンドラ。"""
+        self._main_controller.on_add_prompt(self._state)
         self._update_content()
 
     def _update_content(self) -> None:

@@ -84,11 +84,7 @@ class CategoryTree(ft.Column):
         # トグル（子がある場合のみ表示）
         toggle_btn: ft.Control
         if has_children:
-            icon = (
-                ft.icons.KEYBOARD_ARROW_DOWN
-                if expanded
-                else ft.icons.KEYBOARD_ARROW_RIGHT
-            )
+            icon = "keyboard_arrow_down" if expanded else "keyboard_arrow_right"
             toggle_btn = ft.IconButton(
                 icon=icon,
                 tooltip="展開/折りたたみ",

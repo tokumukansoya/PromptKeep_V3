@@ -21,7 +21,7 @@ class AddCategoryButton(ft.IconButton):
             on_click: ボタンがクリックされた際に呼び出されるコールバック。
         """
         super().__init__(
-            icon=ft.icons.ADD,
+            icon="add",
             tooltip="カテゴリを追加",
             on_click=self._handle_click,
         )

@@ -38,7 +38,7 @@ class CardHeader(ft.Row):
 
         # 左: お気に入りトグル
         self._favorite_btn: ft.IconButton = ft.IconButton(
-            icon=ft.Icons.STAR if self._is_favorite else ft.Icons.STAR_BORDER,
+            icon="star" if self._is_favorite else "star_border",
             icon_color=(
                 colors.STAR_FILLED if self._is_favorite else colors.STAR_UNFILLED
             ),
@@ -50,7 +50,7 @@ class CardHeader(ft.Row):
 
         # 右: コピー
         self._copy_btn: ft.IconButton = ft.IconButton(
-            icon=ft.Icons.CONTENT_COPY,
+            icon="content_copy",
             icon_size=spacing.ICON_SIZE,
             tooltip="コピー",
             on_click=self._handle_copy,
@@ -85,9 +85,7 @@ class CardHeader(ft.Row):
         """
         # 楽観的トグル（UI 即時反映）
         self._is_favorite = not self._is_favorite
-        self._favorite_btn.icon = (
-            ft.Icons.STAR if self._is_favorite else ft.Icons.STAR_BORDER
-        )
+        self._favorite_btn.icon = "star" if self._is_favorite else "star_border"
         self._favorite_btn.icon_color = (
             colors.STAR_FILLED if self._is_favorite else colors.STAR_UNFILLED
         )
