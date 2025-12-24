@@ -73,8 +73,9 @@ class CardGridView(ft.GridView):
         Returns:
             int: 列数（最低 1）。
         """
+        width_attr = getattr(self.page, "window_width", 0.0) if self.page else 0.0
         try:
-            width: float = float(self.page.window_width) if self.page else 0.0
+            width: float = float(width_attr)
         except Exception:
             width = 0.0
         if width <= 0:

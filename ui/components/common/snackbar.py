@@ -40,7 +40,7 @@ def show_snackbar(
     bg = bgcolor or BUTTON_BG
 
     # SnackBar をページに設定
-    page.snack_bar = ft.SnackBar(
+    page.snack_bar = ft.SnackBar(  # type: ignore[attr-defined]
         content=ft.Text(message),
         bgcolor=bg,
         duration=duration_ms,
@@ -51,5 +51,5 @@ def show_snackbar(
     )
 
     # 表示
-    page.snack_bar.open = True
+    page.snack_bar.open = True  # type: ignore[attr-defined]
     page.update()

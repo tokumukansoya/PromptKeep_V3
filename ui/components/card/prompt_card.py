@@ -101,7 +101,7 @@ class PromptCard(ft.Container):
         """
         self._on_click(e, self.prompt)
 
-    def _handle_hover(self, e: ft.HoverEvent) -> None:
+    def _handle_hover(self, e: ft.ControlEvent) -> None:
         """ホバー時の透明度変更。
 
         Args:
