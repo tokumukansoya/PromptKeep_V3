@@ -3,13 +3,10 @@
 Flet 0.28.3、Python 3.14.2 対応。
 """
 
-from typing import Optional
 from config import PREVIEW_MAX_LENGTH
 
 
-def truncate_preview(
-    text: str, max_length: int = PREVIEW_MAX_LENGTH, suffix: str = "…"
-) -> str:
+def truncate_preview(text: str, max_length: int = PREVIEW_MAX_LENGTH, suffix: str = "…") -> str:
     """テキストをプレビュー用に切り詰める。
 
     Args:
@@ -46,9 +43,7 @@ def truncate_title(text: str, max_length: int = 50) -> str:
     return text
 
 
-def highlight_search_query(
-    text: str, query: str, highlight_format: str = "**{text}**"
-) -> str:
+def highlight_search_query(text: str, query: str, highlight_format: str = "**{text}**") -> str:
     """テキスト内の検索クエリをハイライト。
 
     Args:

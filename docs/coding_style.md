@@ -72,14 +72,16 @@ from ui.styles.colors import DARK_BG
 def create_prompt(
     title: str,
     body: str,
-    category_path: List[str]
+    category_ids: List[str]
 ) -> Prompt:
     """プロンプトを新規作成する。
     
     Args:
         title: プロンプトのタイトル。
         body: プロンプトの本文。
-        category_path: カテゴリ階層 ["親", "子", "孫"]。
+        category_ids: カテゴリIDの階層（IDベース）。
+        body: プロンプトの本文。
+        category_ids: カテゴリID階層（IDベース）。
     
     Returns:
         新しく作成された Prompt オブジェクト。
@@ -126,7 +128,7 @@ class Prompt:
     id: str
     title: str
     body: str
-    category_path: List[str]
+    category_ids: List[str]  # IDベース
     favorite: bool
     deleted_at: Optional[datetime]
     created_at: datetime
@@ -437,7 +439,7 @@ def delete_prompt(self, prompt_id: str) -> None:
 - `prompt_id` : プロンプトの一意識別子
 - `prompt` : Prompt オブジェクト
 - `prompts` : Prompt のリスト
-- `category_path` : ["親", "子", "孫"] 形式のリスト
+- `category_ids` : ["cat1_id", "cat2_id", "cat3_id"] 形式のリスト（IDベース）
 
 ---
 
@@ -464,24 +466,21 @@ class PromptService:
 ### 8.3 テスト容易性
 ```python
 # 副作用を持つ処理と純粋な処理を分離
-def validate_category_path(path: List[str]) -> bool:
+def validate_category_depth(category_ids: List[str]) -> bool:
     """純粋関数：ビジネスロジック。"""
-    return len(path) <= MAX_CATEGORY_DEPTH
+    return len(category_ids) <= MAX_CATEGORY_DEPTH
 
 class CategoryService:
-    """副作用を含む操作。"""
+    """副作用を含む操作はStateManagerに委譲。"""
     
-    def add_category(
-        self,
-        name: str,
-        parent_path: List[str]
-    ) -> Category:
-        if not validate_category_path(parent_path + [name]):
-            raise InvalidCategoryDepthError()
-        
-        category = Category(name=name, parent_path=parent_path)
-        self.data_service.save(category)
-        return category
+    def create_category(self, name: str, parent_id: Optional[str]) -> Category:
+        # Categoryオブジェクトを生成して返すだけ
+        return Category(
+            id=str(uuid.uuid4()),
+            name=name,
+            parent_id=parent_id,
+            order=0
+        )
 ```
 
 ---

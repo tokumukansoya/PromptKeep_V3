@@ -4,21 +4,19 @@
 Flet 0.28.3、Python 3.14.2 対応。
 """
 
-import logging
-from typing import List, Optional
 from datetime import datetime
+from typing import List, Optional
 
-from models.prompt import Prompt
-from models.app_state import AppState
-from services.data_service import DataService
-from exceptions import (
-    PromptNotFoundError,
-    InvalidCategoryDepthError,
-    ValidationError,
-)
+from loguru import logger
+
 from config import MAX_CATEGORY_DEPTH
-
-logger = logging.getLogger(__name__)
+from exceptions import (
+    InvalidCategoryDepthError,
+    PromptNotFoundError,
+)
+from models.app_state import AppState
+from models.prompt import Prompt
+from services.data_service import DataService
 
 
 class PromptService:
@@ -43,14 +41,14 @@ class PromptService:
         logger.debug("PromptService initialized")
 
     def create_prompt(
-        self, title: str, body: str, category_path: Optional[List[str]] = None
+        self, title: str, body: str, category_ids: Optional[List[str]] = None
     ) -> Prompt:
         """新規プロンプトを作成。
 
         Args:
             title: プロンプトのタイトル。
             body: プロンプトの本文。
-            category_path: カテゴリ階層。
+            category_ids: カテゴリIDの階層。
 
         Returns:
             新規作成された Prompt オブジェクト。
@@ -63,18 +61,18 @@ class PromptService:
             >>> service = PromptService(data_service)
             >>> prompt = service.create_prompt("タイトル", "本文")
         """
-        if category_path is None:
-            category_path = []
+        if category_ids is None:
+            category_ids = []
 
-        if len(category_path) > MAX_CATEGORY_DEPTH:
+        if len(category_ids) > MAX_CATEGORY_DEPTH:
             logger.error(
-                f"Category depth exceeds limit: {len(category_path)} > {MAX_CATEGORY_DEPTH}"
+                f"Category depth exceeds limit: {len(category_ids)} > {MAX_CATEGORY_DEPTH}"
             )
             raise InvalidCategoryDepthError(
                 f"カテゴリ階層が深すぎます（最大 {MAX_CATEGORY_DEPTH}）"
             )
 
-        prompt = Prompt.create(title, body, category_path)
+        prompt = Prompt.create(title, body, category_ids)
         logger.info(f"Created prompt: {prompt.id}")
         return prompt
 
@@ -107,7 +105,7 @@ class PromptService:
         prompt_id: str,
         title: Optional[str] = None,
         body: Optional[str] = None,
-        category_path: Optional[List[str]] = None,
+        category_ids: Optional[List[str]] = None,
         favorite: Optional[bool] = None,
     ) -> Prompt:
         """既存プロンプトを更新。
@@ -119,7 +117,7 @@ class PromptService:
             prompt_id: 更新対象のプロンプト ID。
             title: 新しいタイトル（未指定時は変更しない）。
             body: 新しい本文（未指定時は変更しない）。
-            category_path: 新しいカテゴリ階層（未指定時は変更しない）。
+            category_ids: 新しいカテゴリID階層（未指定時は変更しない）。
             favorite: 新しいお気に入り状態（未指定時は変更しない）。
 
         Returns:
@@ -140,12 +138,12 @@ class PromptService:
             prompt.title = title
         if body is not None:
             prompt.body = body
-        if category_path is not None:
-            if len(category_path) > MAX_CATEGORY_DEPTH:
+        if category_ids is not None:
+            if len(category_ids) > MAX_CATEGORY_DEPTH:
                 raise InvalidCategoryDepthError(
                     f"カテゴリ階層が深すぎます（最大 {MAX_CATEGORY_DEPTH}）"
                 )
-            prompt.category_path = category_path
+            prompt.category_ids = category_ids
         if favorite is not None:
             prompt.favorite = favorite
 

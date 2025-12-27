@@ -5,8 +5,8 @@ Flet 0.28.3、Python 3.14.2 対応。
 """
 
 from config import CARD_SIZE
-from ui.styles.colors import DARK_BG_SECONDARY, BORDER_COLOR, TEXT_PRIMARY
-from ui.styles.spacing import PADDING_MD, BORDER_RADIUS_MD
+from ui.styles.colors import BORDER_COLOR, DARK_BG_SECONDARY, TEXT_PRIMARY
+from ui.styles.spacing import BORDER_RADIUS_MD, PADDING_MD
 
 # ============================================================================
 # カード全体

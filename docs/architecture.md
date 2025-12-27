@@ -18,12 +18,13 @@ PromptKeep_V3/
 │
 ├── models/                          # データモデル
 │   ├── __init__.py
-│   ├── prompt.py                    # Promptモデル（id, title, body, category_path, favorite, etc.）
+│   ├── prompt.py                    # Promptモデル（id, title, body, category_ids, favorite, etc.）
 │   ├── category.py                  # Categoryモデル（id, name, parent_id）
 │   └── app_state.py                 # アプリ全体の状態管理
 │
 ├── services/                        # ビジネスロジック層
 │   ├── __init__.py
+│   ├── state_manager.py             # **状態管理の中核**（新設）
 │   ├── data_service.py              # データ永続化サービス（JSON読み書き）
 │   ├── prompt_service.py            # プロンプトCRUD操作
 │   ├── category_service.py          # カテゴリCRUD操作
@@ -49,24 +50,17 @@ PromptKeep_V3/
 │   │   ├── sidebar/                 # サイドバー関連
 │   │   │   ├── __init__.py
 │   │   │   ├── sidebar.py           # サイドバー全体
-│   │   │   ├── search_box.py        # 検索ボックス
-│   │   │   ├── category_tree.py     # カテゴリツリー
-│   │   │   ├── category_item.py     # カテゴリアイテム（ドラッグ対応）
-│   │   │   └── add_category_button.py  # カテゴリ追加ボタン
+│   │   │   └── category_tree.py     # カテゴリツリー（検索込み）
 │   │   │
-│   │   ├── card/                    # カード関連
+│   │   ├── card/                    # カード関連（簡素化）
 │   │   │   ├── __init__.py
-│   │   │   ├── prompt_card.py       # プロンプトカード全体
-│   │   │   ├── card_header.py       # カードヘッダー（お気に入り、コピー）
-│   │   │   ├── card_body.py         # カード本文（タイトル、プレビュー）
-│   │   │   └── card_actions.py      # カードアクション（削除など）
+│   │   │   └── prompt_card.py       # プロンプトカード全体
 │   │   │
 │   │   ├── editor/                  # 編集エリア関連
 │   │   │   ├── __init__.py
 │   │   │   ├── title_field.py       # タイトル入力フィールド
 │   │   │   ├── body_field.py        # 本文テキストエリア
-│   │   │   ├── category_selector.py # カテゴリ選択UI
-│   │   │   └── editor_toolbar.py    # エディタツールバー（戻るボタンなど）
+│   │   │   └── category_selector.py # カテゴリ選択UI
 │   │   │
 │   │   ├── dialogs/                 # ダイアログ
 │   │   │   ├── __init__.py
@@ -109,15 +103,18 @@ PromptKeep_V3/
 - **役割**: データ構造の定義。ビジネスロジックやUIには依存しない。
 - **責務**:
   - Prompt/Category のデータクラス定義
-  - アプリ全体の状態管理（AppState）
+  - AppState（アプリ全体の状態コンテナ）
   - データの型定義とバリデーション
+- **重要**: category_ids は**IDベース**でカテゴリ名変更の影響を受けない
 
 ### services/
 - **役割**: ビジネスロジックの実装。UIから独立して動作。
 - **責務**:
-  - データの CRUD 操作
-  - JSONファイルの読み書き
+  - **StateManager**: 状態管理の中核。全ての状態変更を統括、デバウンス付き自動保存
+  - **PromptService/CategoryService**: ビジネスロジックのみ。状態変更はStateManagerに委譲
+  - **DataService**: JSON読み書きの低レベル操作
   - 検索・フィルタリング
+  - クリップボード操作
   - 削除のアンドゥ管理
 
 ### ui/views/
@@ -182,7 +179,7 @@ class Prompt:
     id: str
     title: str
     body: str
-    category_path: List[str]
+    category_ids: List[str]  # IDベース（名前ではない）
     favorite: bool
     deleted_at: Optional[datetime]
     created_at: datetime
@@ -201,13 +198,43 @@ class Category:
 
 ### models/app_state.py
 ```python
+@dataclass
 class AppState:
     prompts: List[Prompt]
     categories: List[Category]
-    trash: List[str]  # prompt IDs
-    selected_category: Optional[str]
+    trash_prompt_ids: List[str]
+    trash_category_ids: List[str]
+    selected_category_id: Optional[str]
     search_query: str
-    current_editing: Optional[str]  # prompt ID
+    current_editing_id: Optional[str]
+```
+
+### services/state_manager.py（新設・重要）
+```python
+class StateManager:
+    \"\"\"状態管理の中核。全ての状態変更はここを経由する。\"\"\"
+    
+    def __init__(self, page: ft.Page, data_service: DataService):
+        self._page = page
+        self._state = AppState.empty()
+        self._data_service = data_service
+        self._listeners = []
+    
+    # 状態変更メソッド
+    def update_prompts(self, prompts: List[Prompt]):
+        self._state.prompts = prompts
+        self._notify_listeners()
+        self._schedule_save()  # デバウンス付き自動保存
+    
+    def _schedule_save(self):
+        if self._save_task:
+            self._save_task.cancel()
+        # Flet推奨: page.run_task()でバックグラウンドタスク実行
+        self._save_task = self._page.run_task(self._debounced_save)
+    
+    # リスナー管理
+    def add_listener(self, callback):
+        self._listeners.append(callback)
 ```
 
 ### services/data_service.py
@@ -216,34 +243,77 @@ class AppState:
 - `create_backup() -> None`
 
 ### services/prompt_service.py
-- `create_prompt(title, body, category_path) -> Prompt`
-- `update_prompt(id, **kwargs) -> Prompt`
-- `delete_prompt(id) -> None`
-- `restore_prompt(id) -> None`
-- `get_filtered_prompts(category, search, favorite) -> List[Prompt]`
+```python
+class PromptService:
+    \"\"\"ビジネスロジックのみ。状態変更はStateManagerに委譲。\"\"\"
+    
+    def create_prompt(self, title: str, body: str, category_ids: List[str]) -> Prompt:
+        # Promptオブジェクトを生成して返すだけ
+        return Prompt.create(title, body, category_ids)
+    
+    def validate_category_depth(self, category_ids: List[str]) -> bool:
+        # 階層制約の検証
+        return len(category_ids) <= MAX_CATEGORY_DEPTH
+```
 
 ### ui/controllers/main_controller.py
-- `on_add_prompt()`
-- `on_card_click(prompt_id)`
-- `on_delete_prompt(prompt_id)`
-- `on_copy_prompt(prompt_id)`
-- `on_toggle_favorite(prompt_id)`
-- `on_category_change(category_id)`
-- `on_search(query)`
+```python
+class MainController:
+    def __init__(self, state_manager: StateManager):
+        self.state_manager = state_manager
+        self.state_manager.add_listener(self._on_state_changed)
+    
+    def on_add_prompt(self):
+        prompt = self.prompt_service.create_prompt(...)
+        prompts = self.state_manager.state.prompts + [prompt]
+        self.state_manager.update_prompts(prompts)  # StateManagerを経由
+```
 
-## 5. 状態管理の方針
+## 5. 状態管理の方針（重要な設計決定）
 
-- **単一のグローバル状態**: `AppState` を `main.py` で保持
-- **イミュータブル更新**: 状態は常に新しいオブジェクトで置き換え
-- **自動保存**: 状態変更後、デバウンス付きで JSON 保存
-- **リアクティブUI**: 状態変更時に関連する UI コンポーネントを再描画
+### StateManager方式を採用
+- **単一責任**: StateManagerが状態管理・永続化・通知を統括
+- **デバウンス自動保存**: 2秒のデバウンス付きで自動保存
+- **Controller分離**: 各ControllerはStateManagerを経由して状態変更
+- **リアクティブUI**: リスナーパターンでUI更新を通知
+
+### データフロー
+```
+User Action
+    ↓
+[Controller] ← イベント受付
+    ↓
+[Service] ← ビジネスロジック（Promptオブジェクト生成など）
+    ↓
+[StateManager] ← 状態更新 + デバウンス付き保存
+    ↓
+[Listeners] → UI自動更新
+```
+
+### 重要な制約
+- **Controllerは状態を直接変更しない**: 必ずStateManagerのメソッドを呼ぶ
+- **Serviceは状態を持たない**: 純粋な関数として実装
+- **category_idsはIDベース**: カテゴリ名変更時もプロンプトは影響を受けない
 
 ## 6. エラーハンドリング
 
+### 例外の統一的な処理
+```python
+class BaseController:
+    def handle_error(self, error: Exception):
+        if isinstance(error, PromptKeeperError):
+            self.show_snackbar(error.user_message)  # ユーザーフレンドリーなメッセージ
+            logger.warning(str(error))
+        else:
+            self.show_snackbar("予期しないエラーが発生しました")
+            logger.error(f"Unexpected error: {error}", exc_info=True)
+```
+
+### エラー種別
 - **JSON読み込み失敗**: バックアップから復元 or 空データで起動
-- **JSON書き込み失敗**: ロールバック＋エラーメッセージ
-- **カテゴリ階層エラー**: 操作キャンセル＋理由説明
-- **すべてのエラー**: `utils/logger.py` でログ記録
+- **JSON書き込み失敗**: DataPersistenceErrorをスロー、ユーザーに通知
+- **カテゴリ階層エラー**: InvalidCategoryDepthError（ユーザーメッセージ付き）
+- **すべてのエラー**: `utils/logger.py` で自動ログ記録
 
 ## 7. 実装の優先順位
 
@@ -262,8 +332,8 @@ class AppState:
 
 ### Phase 3: カテゴリ（重要）
 10. services/category_service.py - カテゴリ管理
-11. ui/components/sidebar/category_tree.py - カテゴリツリー
-12. ui/components/sidebar/category_item.py - ドラッグ&ドロップ
+11. ui/components/sidebar/category_tree.py - カテゴリツリー（ListTile + Column）
+12. ui/components/sidebar/category_item.py - ListTile + Draggable/DragTarget
 
 ### Phase 4: 追加機能（重要）
 13. services/undo_service.py - アンドゥ管理

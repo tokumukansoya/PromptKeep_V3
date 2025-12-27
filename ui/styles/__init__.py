@@ -4,8 +4,8 @@
 """
 
 from ui.styles.colors import *
-from ui.styles.typography import *
 from ui.styles.spacing import *
+from ui.styles.typography import *
 
 __all__ = [
     "DARK_BG",

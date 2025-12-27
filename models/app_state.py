@@ -5,9 +5,10 @@ Flet 0.28.3、Python 3.14.2 対応。
 """
 
 from dataclasses import dataclass, field
-from typing import List, Optional, Dict
-from models.prompt import Prompt
+from typing import List, Optional
+
 from models.category import Category
+from models.prompt import Prompt
 
 
 @dataclass
@@ -26,8 +27,9 @@ class AppState:
         undo_stack: アンドゥ用のスタック（直前の状態を保持）。
 
     Note:
-        - 状態は イミュータブル に更新（新しい AppState を作成）。
-        - 変更後は自動保存（サービス層で処理）。
+        - 状態更新はStateManagerを経由して行う（直接変更禁止）。
+        - StateManagerがデバウンス付き自動保存を管理。
+        - 各Controllerは状態を直接変更せず、StateManagerのメソッドを呼ぶ。
     """
 
     prompts: List[Prompt] = field(default_factory=list)

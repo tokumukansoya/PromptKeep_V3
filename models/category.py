@@ -4,9 +4,9 @@
 Flet 0.28.3、Python 3.14.2 対応。
 """
 
+import uuid
 from dataclasses import dataclass
 from typing import Optional
-import uuid
 
 
 @dataclass
@@ -34,9 +34,7 @@ class Category:
     order: int
 
     @staticmethod
-    def create(
-        name: str, parent_id: Optional[str] = None, order: int = 0
-    ) -> "Category":
+    def create(name: str, parent_id: Optional[str] = None, order: int = 0) -> "Category":
         """新規カテゴリを作成する。
 
         Args:
@@ -52,9 +50,7 @@ class Category:
             >>> print(category.name)
             AI
         """
-        return Category(
-            id=str(uuid.uuid4()), name=name, parent_id=parent_id, order=order
-        )
+        return Category(id=str(uuid.uuid4()), name=name, parent_id=parent_id, order=order)
 
     def to_dict(self) -> dict:
         """Category オブジェクトを辞書に変換。

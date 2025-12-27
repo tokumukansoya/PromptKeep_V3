@@ -7,6 +7,46 @@
 
 ---
 
+## 🎯 ドキュメント駆動開発
+
+このプロジェクトは **ドキュメント駆動開発** で進めています。
+
+### 📚 ドキュメント構成
+
+```
+docs/
+├── 🔴 必読（人間向け）
+│   ├── QUICKSTART.md        # 開発者向けクイックスタート（5分で読める）
+│   ├── architecture.md      # 設計・構造
+│   └── coding_style.md      # コーディング規約
+│
+├── 📖 参照用
+│   ├── requirements.md      # 機能要件の詳細
+│   ├── implementation_plan.md # Phase別計画
+│   └── git_workflow.md      # Git運用詳細
+│
+├── 🤖 AI専用
+│   ├── ai_execution_guide.md # AI向け実装コマンド
+│   └── ai_prompts.md        # AI向けプロンプト集
+│
+├── 🔧 技術参考
+│   ├── ASYNC_GUIDELINES.md  # 非同期処理ガイド
+│   ├── FLET_FEATURE_COMPATIBILITY.md # Flet機能検証
+│   └── PHASE_0.5_DEV_TOOLS.md # 開発ツールセットアップ
+│
+└── 📦 archive/              # 過去の調査記録
+```
+
+### 👤 人間の開発者は？
+
+**[docs/QUICKSTART.md](docs/QUICKSTART.md)** を読んでください（5分で読めます）。
+
+### 🤖 AI（Roo Code/Copilot）は？
+
+**[docs/ai_execution_guide.md](docs/ai_execution_guide.md)** を参照してください。
+
+---
+
 ## 概要
 
 PromptKeep は、AI プロンプトを効率的に管理するために設計されたデスクトップアプリです。
@@ -23,6 +63,9 @@ PromptKeep は、AI プロンプトを効率的に管理するために設計さ
 **技術スタック:**
 - Python 3.14.2
 - Flet 0.28.3（UI フレームワーク）
+- uv（パッケージ管理）
+- Ruff（Linter/Formatter）
+- Loguru（ロギング）
 - JSON（ローカルデータ永続化）
 
 ---
@@ -39,23 +82,24 @@ PromptKeep は、AI プロンプトを効率的に管理するために設計さ
 # リポジトリをクローン
 cd PromptKeep_V3
 
-# 仮想環境を作成
-python -m venv .venv
-
-# 仮想環境を有効化
-# Windows:
-.venv\Scripts\activate
+# uvのインストール（まだの場合）
 # macOS/Linux:
-source .venv/bin/activate
+curl -LsSf https://astral.sh/uv/install.sh | sh
+# Windows:
+powershell -c "irm https://astral.sh/uv/install.ps1 | iex"
 
-# 依存パッケージをインストール
-pip install -r requirements.txt
+# 依存関係のインストール
+uv sync
 ```
 
 ### アプリケーション起動
 
 ```bash
-python main.py
+# アプリケーションを起動
+uv run python main.py
+
+# または開発モードで起動
+uv run flet run main.py
 ```
 
 ---
@@ -220,19 +264,14 @@ PromptKeep_V3/
 ### ローカル開発フロー
 
 ```bash
-# 1. 仮想環境を有効化
-.venv\Scripts\activate  # Windows
-# または
-source .venv/bin/activate  # macOS/Linux
+# 1. ファイルを編集
 
-# 2. ファイルを編集
+# 2. 現在の状態を確認
+uv run python main.py
 
-# 3. 現在の状態を確認
-python main.py
+# 3. AI に指示（テンプレート使用）
 
-# 4. AI に指示（テンプレート使用）
-
-# 5. 生成されたコードをコミット
+# 4. 生成されたコードをコミット
 ```
 
 ---
@@ -257,11 +296,8 @@ SystemExit: Python 3.14以上が必要です（現在: 3.x.x）
 # インストール後、バージョン確認
 python --version
 
-# 仮想環境を再作成
-rm -r .venv
-python -m venv .venv
-.venv\Scripts\activate  # Windows
-pip install -r requirements.txt
+# uv環境を再構築
+uv sync
 ```
 
 ### Flet バージョンエラー
@@ -277,29 +313,24 @@ Flet version mismatch: expected 0.28.3, got X.X.X
 **対応:**
 ```bash
 # 正しいバージョンをインストール
-pip install flet==0.28.3
+uv add flet==0.28.3
 
 # バージョン確認
-pip show flet
+uv run python -c "import flet; print(flet.__version__)"
 ```
 
 ### ImportError: No module named 'flet'
 
 **原因:**
-- 仮想環境が有効化されていない
 - 依存パッケージがインストールされていない
 
 **対応:**
 ```bash
-# 1. 仮想環境を有効化
-.venv\Scripts\activate  # Windows
-source .venv/bin/activate  # macOS/Linux
+# 依存パッケージをインストール
+uv sync
 
-# 2. 依存パッケージをインストール
-pip install -r requirements.txt
-
-# 3. 動作確認
-python main.py
+# 動作確認
+uv run python main.py
 ```
 
 ### JSON データ読み込みエラー
@@ -316,7 +347,7 @@ InvalidDataError: JSON の形式が不正です
 **対応:**
 ```bash
 # バックアップから復元
-python -c "
+uv run python -c "
 from services.data_service import DataService
 ds = DataService()
 ds.restore_from_backup()
@@ -325,7 +356,7 @@ print('Restored from backup')
 
 # または、古いファイルを削除して再作成
 rm data/prompts.json
-python main.py
+uv run python main.py
 ```
 
 ### ファイルパーミッションエラー

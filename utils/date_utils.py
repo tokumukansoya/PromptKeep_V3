@@ -4,7 +4,6 @@ Flet 0.28.3、Python 3.14.2 対応。
 """
 
 from datetime import datetime
-from typing import Optional
 
 
 def format_datetime(dt: datetime, format_str: str = "%Y-%m-%d %H:%M:%S") -> str:

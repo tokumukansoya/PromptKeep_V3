@@ -1,8 +1,12 @@
 # PromptKeep 実装計画（ロードマップ）
 
+> **AI実装者向け**: 各Phaseの詳細な実行コマンドは [ai_execution_guide.md](ai_execution_guide.md) を参照してください。このドキュメントは全体像を把握するためのマップです。
+
+---
+
 ## 概要
 このドキュメントは、PromptKeep を段階的に実装するための計画です。
-各 Phase で実装する機能、依存関係、優先度を定義しています。
+各 Phase で実装する機能、依存関係、優先度、**検証可能な成功基準**を定義しています。
 
 ---
 
@@ -24,9 +28,67 @@
 - main.py（エントリーポイント）
 - utils/*.py（スタブ）
 
+**検証可能な成功基準**:
+```bash
+# 1. uvのインストール確認
+uv --version
+# → uv 0.x.x が表示される
+
+# 2. 依存関係のインストール成功
+uv sync
+# → エラーなく完了
+
+# 2. config.py の定数確認
+python -c "from config import MAX_CATEGORY_DEPTH; print(MAX_CATEGORY_DEPTH)"
+# → 3 が出力される
+
+# 3. ディレクトリ構造確認
+ls -R
+# → models/, services/, ui/, utils/, data/ が存在する
+
+# 4. main.py の実行確認
+uv run python main.py
+# → エラーなく起動（UI表示はまだ空でOK）
+```
+
 **依存**: なし
 **難易度**: ⭐
 **予想時間**: 30分
+
+---
+
+## Phase 0.5: 開発ツール導入（推奨）
+
+**目的**: RuffとLoguruの導入で開発効率向上
+
+**実装内容**:
+1. Ruff（Linter/Formatter）のインストールと設定
+2. Loguru（ロギング）のインストール
+3. `utils/logger.py` の作成
+4. VS Code設定ファイルの作成
+
+**成果物**:
+- Ruffが使える状態
+- Loguruによる統一ロギング
+- 保存時自動フォーマット
+
+**検証可能な成功基準**:
+```bash
+# Ruffが動作する
+uv run ruff check .
+uv run ruff format --check .
+
+# Loguruが動作する
+uv run python -c "from utils.logger import logger; logger.info('Test')"
+# → カラフルなログが出力される
+# → logs/promptkeep_YYYY-MM-DD.log が作成される
+```
+
+**詳細**: [docs/PHASE_0.5_DEV_TOOLS.md](PHASE_0.5_DEV_TOOLS.md)
+
+**依存**: Phase 0
+**難易度**: ⭐
+**予想時間**: 20分
 
 ---
 
@@ -49,6 +111,53 @@
 - JSON スキーマに対応した読み書き
 - バックアップ機能の基本構造
 
+**検証可能な成功基準**:
+```python
+# 1. データクラスのインポート成功
+from models.prompt import Prompt
+from models.category import Category
+from models.app_state import AppState
+# → エラーなし
+
+# 2. Promptオブジェクトの作成
+from datetime import datetime
+p = Prompt(
+    id="test-id",
+    title="テスト",
+    body="本文",
+    category_ids=[],
+    favorite=False,
+    deleted_at=None,
+    created_at=datetime.now(),
+    updated_at=datetime.now()
+)
+print(p.title)
+# → "テスト" が出力される
+
+# 3. DataServiceのJSON読み書き
+from services.data_service import DataService
+ds = DataService("data/test.json")
+state = AppState(prompts=[p], categories=[], trash_prompt_ids=[], trash_category_ids=[])
+ds.save(state)
+# → data/test.json が作成される
+
+loaded_state = ds.load()
+print(len(loaded_state.prompts))
+# → 1 が出力される
+
+# 4. text_utils のプレビュー生成
+from utils.text_utils import create_preview
+preview = create_preview("これは長いテキストです。" * 10, max_length=50)
+print(len(preview))
+# → 50前後（省略記号含む）
+
+# 5. 日時フォーマット
+from utils.date_utils import format_datetime
+formatted = format_datetime(datetime.now())
+print(formatted)
+# → "2025-12-27 12:34:56" 形式で出力
+```
+
 **依存**: Phase 0
 **難易度**: ⭐⭐
 **予想時間**: 1.5時間
@@ -66,47 +175,113 @@
 
 ## Phase 2: ビジネスロジック層（必須）
 
-**目的**: プロンプト・カテゴリの CRUD 操作を実装
+**目的**: プロンプト・カテゴリの CRUD 操作と状態管理を実装
 
 **実装内容**:
-1. `services/prompt_service.py` - プロンプト CRUD
-   - `create_prompt()`
-   - `update_prompt()`
-   - `delete_prompt()`
-   - `get_prompt()`
-   - `list_prompts()`
-   - `restore_prompt()`
-2. `services/category_service.py` - カテゴリ CRUD
-   - `create_category()`
-   - `update_category()`
-   - `delete_category()`
-   - `list_categories()`
-   - `move_category()`（ドラッグ&ドロップ対応）
-3. `services/undo_service.py` - アンドゥ管理
-   - `push_state()`
-   - `undo()`
-4. `services/clipboard_service.py` - クリップボード操作
+1. **`services/state_manager.py`** - **状態管理の中核（最優先）**
+   - StateManagerクラスの実装
+   - デバウンス付き自動保存
+   - リスナーパターンによる通知機能
+2. `services/prompt_service.py` - プロンプトビジネスロジック
+   - `create_prompt()` - Promptオブジェクト生成のみ
+   - `validate_category_depth()` - 階層制約の検証
+   - 状態変更はStateManagerに委譲
+3. `services/category_service.py` - カテゴリビジネスロジック
+   - `create_category()` - Categoryオブジェクト生成
+   - `get_category_path()` - IDから階層パスを生成
+   - `validate_move()` - 移動時の階層検証
+4. `services/undo_service.py` - アンドゥ管理
+   - `push_state()`, `undo()` - Commandパターンで拡張可能
+5. `services/clipboard_service.py` - クリップボード操作
    - `copy_to_clipboard()`
-5. `services/search_service.py` - 検索・フィルタ
-   - `search_prompts()`
+6. `services/search_service.py` - 検索・フィルタ
+   - `search_prompts()`, `filter_by_category()`
    - `filter_by_category()`
    - `filter_by_favorite()`
 
 **成果物**:
-- ビジネスロジックの完成形（UI なしで動作確認可能）
+- StateManager（状態管理の中核）
+- 各Serviceのビジネスロジック（状態変更なし、純粋関数）
+- UIなしで動作確認可能
+
+**検証可能な成功基準**:
+```python
+# 1. StateManagerの動作確認
+from services.state_manager import StateManager
+from services.data_service import DataService
+
+ds = DataService("data/test.json")
+sm = StateManager(ds, debounce_seconds=0.5)
+
+# リスナー登録
+def on_state_change(state):
+    print(f"State updated: {len(state.prompts)} prompts")
+
+sm.add_listener(on_state_change)
+
+# 状態変更
+sm.load()  # → ファイルから読み込み
+prompt = Prompt.create("Test", "Body", [])
+sm.update_prompts([prompt])  # → リスナー通知 + 0.5秒後に自動保存
+
+# 2. PromptServiceのビジネスロジック
+from services.prompt_service import PromptService
+
+ps = PromptService()
+
+# プロンプト作成（オブジェクト生成のみ）
+prompt = ps.create_prompt("タイトル", "本文", [])
+print(prompt.id)  # → UUID が出力される
+
+# カテゴリ深度検証
+assert ps.validate_category_depth(["cat1", "cat2", "cat3"]) == True
+assert ps.validate_category_depth(["cat1", "cat2", "cat3", "cat4"]) == False
+
+# 3. CategoryServiceの階層パス生成
+from services.category_service import CategoryService
+
+cs = CategoryService()
+
+categories = [
+    Category(id="cat1", name="親", parent_id=None, order=0),
+    Category(id="cat2", name="子", parent_id="cat1", order=0),
+    Category(id="cat3", name="孫", parent_id="cat2", order=0),
+]
+
+path = cs.get_category_path(categories, "cat3")
+print(path)  # → ["親", "子", "孫"]
+
+# 4階層目の検証
+try:
+    cs.validate_depth(categories, "cat3", "cat4")
+except InvalidCategoryDepthError as e:
+    print(e.user_message)  # → "カテゴリは最大3階層までです"
+
+# 4. SearchService
+from services.search_service import SearchService
+
+ss = SearchService()
+prompts = [
+    Prompt.create("Python入門", "Pythonの基礎", []),
+    Prompt.create("JavaScript入門", "JSの基礎", []),
+]
+
+results = ss.search_prompts(prompts, "python")
+print(len(results))  # → 1（大文字小文字を区別しない）
+print(results[0].title)  # → "Python入門"
+```
 
 **依存**: Phase 1
 **難易度**: ⭐⭐⭐
 **予想時間**: 2.5時間
 
 **実装順序**:
-1. services/prompt_service.py（create, get, list）
-2. services/prompt_service.py（update, delete, restore）
-3. services/undo_service.py
-4. services/category_service.py（CRUD）
-5. services/category_service.py（move, 階層検証）
-6. services/clipboard_service.py
-7. services/search_service.py
+1. **services/state_manager.py**（最優先・他の全てがこれに依存）
+2. services/prompt_service.py（ビジネスロジックのみ）
+3. services/category_service.py（階層検証・パス生成）
+4. services/undo_service.py
+5. services/clipboard_service.py
+6. services/search_service.py
 
 ---
 
@@ -320,7 +495,32 @@
 
 ---
 
-## Phase 12: テスト・バグ修正（重要）
+## Phase 12: Undo機能拡張（オプション・低優先度）
+
+**目的**: Undo機能を削除以外にも拡張（Phase 2で基本実装済み）
+
+**実装内容**:
+1. Commandパターンの導入検討
+2. 複数操作のUndo対応（編集、カテゴリ移動など）
+3. Redo機能の追加
+4. Undoスタックの永続化検討
+
+**成果物**:
+- 拡張されたUndo/Redo機能
+
+**Note**:
+- Phase 2で「削除のUndo」は既に実装済み
+- 本Phaseは追加の拡張であり、必須ではない
+- 代替案: ゴミ箱の復元機能を充実させて対応
+- Commandパターンを採用する場合は設計の大幅な変更が必要
+
+**依存**: Phase 2（基本Undo）, Phase 7（統合）
+**難易度**: ⭐⭐⭐⭐
+**予想時間**: 3時間
+
+---
+
+## Phase 13: テスト・バグ修正（重要）
 
 **目的**: 機能的な完成と品質向上
 
@@ -328,7 +528,8 @@
 1. 統合テスト（手動）
 2. エッジケースの確認
 3. UI/UX の微調整
-4. パフォーマンスチューニング
+4. パフォーマンスチューニング（1000件超のテスト）
+5. ページネーション動作確認
 
 **成果物**:
 - 安定して動作するアプリケーション
@@ -343,7 +544,9 @@
 
 ```
 Phase 0 (基盤)
-  ├─→ Phase 1 (データ層)
+  ├─→ Phase 0.5 (開発ツール) ★ 新規
+  │    └─→ Phase 1 (データ層)
+  │         ├─→ Phase 2 (ビジネスロジック)
   │    ├─→ Phase 2 (ビジネスロジック)
   │    │    ├─→ Phase 5 (編集機能)
   │    │    ├─→ Phase 6 (カテゴリ管理)

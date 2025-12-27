@@ -7,25 +7,16 @@ Flet 0.28.3、Python 3.14.2 対応。
 """
 
 import sys
-import logging
-from pathlib import Path
-from importlib.metadata import version, PackageNotFoundError
+from importlib.metadata import PackageNotFoundError, version
 
 # バージョン確認
-import flet as ft
 from config import (
-    REQUIRED_FLET_VERSION,
     MIN_PYTHON_VERSION,
-    LOG_LEVEL,
-    LOG_FORMAT,
+    REQUIRED_FLET_VERSION,
 )
 
-# ログ設定
-logging.basicConfig(
-    level=LOG_LEVEL,
-    format=LOG_FORMAT,
-)
-logger = logging.getLogger(__name__)
+# Loguru ロガー（自動設定済み）
+from utils.logger import logger
 
 
 def check_versions() -> None:
@@ -35,9 +26,7 @@ def check_versions() -> None:
         SystemExit: バージョンが適切でない場合。
     """
     # Python バージョン確認
-    python_version = (
-        f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}"
-    )
+    python_version = f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}"
     logger.info(f"Python version: {python_version} (required: {MIN_PYTHON_VERSION}+)")
 
     if sys.version_info < (3, 14):

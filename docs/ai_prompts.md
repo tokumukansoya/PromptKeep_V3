@@ -1,16 +1,41 @@
 # AI 指示用テンプレート集
 
+> **重要**: このドキュメントは補助的なテンプレート集です。**実装時は [ai_execution_guide.md](ai_execution_guide.md) を優先的に参照してください。**
+
 このドキュメントは、各 Phase を実装する際に GitHub Copilot や Roo Code にコピペで使えるテンプレート集です。
 
 ---
 
 ## 📋 使い方
 
+### 推奨フロー（Roo Code向け）
+1. **まず [ai_execution_guide.md](ai_execution_guide.md) を確認**
+   - 詳細な実行コマンドと成功確認チェックリストがあります
+   - Phase間の依存関係と全体マップも記載されています
+
+2. **このドキュメントの使い方**
+   - ai_execution_guide.md に記載のないPhaseのテンプレートを参照
+   - 既存のテンプレートをカスタマイズする際の参考として使用
+
+### 基本的な使い方
 1. 実装したい Phase のテンプレートをコピー
 2. `[TODO]` 部分を必要に応じて編集（通常はそのままでOK）
 3. GitHub Copilot / Roo Code に貼り付け
 4. 生成されたコードを確認
 5. [docs/coding_style.md](coding_style.md) のチェックリストで検証
+
+---
+
+## 📚 ドキュメント参照優先順位
+
+AI実装時は以下の順で参照してください：
+
+1. ⭐️ **[ai_execution_guide.md](ai_execution_guide.md)** - 最優先・最も詳細
+2. **[coding_style.md](coding_style.md)** - コーディング規約
+3. **[requirements.md](requirements.md)** - 機能要件（最適化済み）
+4. **[architecture.md](architecture.md)** - アーキテクチャ設計
+5. **[implementation_plan.md](implementation_plan.md)** - 実装計画の全体像
+6. 📄 **本ファイル（ai_prompts.md）** - 補助的なテンプレート
 
 ---
 
@@ -26,12 +51,20 @@
 
 ---
 
-## Phase 2: ビジネスロジック層（一部完了）
+## Phase 2: ビジネスロジック層
+
+> **注意**: Phase 2の詳細な実行コマンドは [ai_execution_guide.md](ai_execution_guide.md) を参照してください。
+> 
+> 以下は補助的なテンプレートです。
 
 ### Phase 2-1: CategoryService 実装
 
 ```markdown
 【Phase 2-1: CategoryService 実装】
+
+詳細は [ai_execution_guide.md](ai_execution_guide.md) の Phase 2-1 セクションを参照してください。
+
+以下は簡易版テンプレートです：
 
 バージョン：
 - Python 3.14.2
@@ -52,7 +85,7 @@
    - get_category(state, category_id) -> Category
    - list_categories(state) -> List[Category]
    - move_category(state, category_id, new_parent_id) -> Category
-   - validate_depth(category_path: List[str]) -> bool
+   - validate_depth(category_ids: List[str]) -> bool
 
 2. カテゴリ階層の検証
    - 最大 3 階層まで（config.MAX_CATEGORY_DEPTH）
@@ -189,9 +222,9 @@
 実装内容：
 1. SearchService クラスの作成
    - search_prompts(prompts: List[Prompt], query: str) -> List[Prompt]
-   - filter_by_category(prompts: List[Prompt], category_path: List[str]) -> List[Prompt]
+   - filter_by_category(prompts: List[Prompt], category_ids: List[str]) -> List[Prompt]
    - filter_by_favorite(prompts: List[Prompt]) -> List[Prompt]
-   - apply_filters(prompts: List[Prompt], query: str, category_path: Optional[List[str]], favorite: bool) -> List[Prompt]
+   - apply_filters(prompts: List[Prompt], query: str, category_ids: Optional[List[str]], favorite: bool) -> List[Prompt]
 
 2. 検索ロジック
    - タイトルと本文の両方を対象
@@ -704,7 +737,7 @@
 実装内容：
 1. EditController クラス
    - __init__(self, prompt_service: PromptService, data_service: DataService)
-   - on_save(state: AppState, prompt_id: str, title: str, body: str, category_path: List[str]) -> None
+   - on_save(state: AppState, prompt_id: str, title: str, body: str, category_ids: List[str]) -> None
    - on_back(on_view_change: Callable) -> None
 
 2. 保存処理
@@ -858,7 +891,7 @@
 - Flet IconButton: https://flet.dev/docs/controls/iconbutton
 ```
 
-### Phase 6-4: CategoryItem（ドラッグ対応）
+### Phase 6-4: CategoryItem（ListTile + Draggable/DragTarget）
 
 ```markdown
 【Phase 6-4: CategoryItem コンポーネント実装】
@@ -871,38 +904,51 @@
 - ui/components/sidebar/category_item.py
 
 要件：
-カテゴリアイテム（ドラッグ&ドロップ対応）を実装してください。
+カテゴリアイテム（ListTile + ドラッグ&ドロップ対応）を実装してください。
 
 実装内容：
-1. CategoryItem クラス（ft.Draggable を使用）
-   - __init__(self, category: Category, on_click: Callable, on_drag: Callable)
-   - build() -> ft.Draggable
+1. CategoryItem クラス（ft.ListTile + ft.Draggable + ft.DragTarget）
+   - __init__(self, category: Category, depth: int, on_click: Callable, on_will_accept: Callable, on_accept: Callable, on_leave: Callable)
+   - build() -> ft.DragTarget[ft.Draggable[ft.ListTile]]
 
-2. ドラッグ&ドロップ
-   - ft.Draggable でドラッグ可能に
-   - ft.DragTarget でドロップ先に
-   - on_drag コールバックで移動処理
+2. ListTile 構成
+   - leading: インデント + 階層記号（├ または └）
+   - title: カテゴリ名（Text）
+   - on_click: カテゴリ選択コールバック
 
 3. 階層表現
-   - インデントで階層を表現
-   - 親子関係を視覚的に示す
+   - depth 引数でインデント量を計算（depth * 20px）
+   - depth=0: 記号なし、depth=1: ├、depth=2: └
+   - leading_width でインデントを設定
 
-4. イベント
+4. ドラッグ&ドロップ
+   - ft.Draggable: ドラッグ元（src_id=category.id）
+   - ft.DragTarget: ドロップ先（data=category.id）
+   - on_will_accept: ドロップ可否判定 + ボーダー色変更
+   - on_accept: 移動処理
+   - on_leave: ボーダーリセット
+
+5. イベント
    - on_click：カテゴリ選択
-   - on_drag：カテゴリ移動
+   - on_will_accept：ドロップ可否チェック
+   - on_accept：カテゴリ移動
+   - on_leave：ボーダーリセット
 
 依存：
 - Phase 2-1（services/category_service.py）完了
+- category_service.can_move_to() メソッドが実装済み
 
 規約厳守事項：
 - 型ヒント：Category, Callable などを明記
 - Docstring：Google Style で記載
-- Flet 0.28.3 の Draggable/DragTarget API を使用
+- Flet 0.28.3 の ListTile, Draggable, DragTarget API を使用
 - 階層深さは MAX_CATEGORY_DEPTH まで
 
 参考ドキュメント：
+- Flet ListTile: https://flet.dev/docs/controls/listtile
 - Flet Draggable: https://flet.dev/docs/controls/draggable
-- アーキテクチャ: docs/architecture.md
+- Flet DragTarget: https://flet.dev/docs/controls/dragtarget
+- 要件定義: docs/requirements.md (8.4節)
 ```
 
 ### Phase 6-5: CategoryTree

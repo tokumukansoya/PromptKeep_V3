@@ -5,15 +5,14 @@ Flet 0.28.3、Python 3.14.2 対応。
 """
 
 import json
-import logging
-from typing import Optional
 from pathlib import Path
+from typing import Optional
 
-from config import DATA_DIR, PROMPTS_FILE, BACKUP_DIR
-from models.app_state import AppState
+from loguru import logger
+
+from config import BACKUP_DIR, DATA_DIR, PROMPTS_FILE
 from exceptions import DataPersistenceError, InvalidDataError
-
-logger = logging.getLogger(__name__)
+from models.app_state import AppState
 
 
 class DataService:
@@ -85,9 +84,7 @@ class DataService:
         """
         try:
             if not self.prompts_file.exists():
-                logger.info(
-                    f"Prompts file not found, returning empty state: {self.prompts_file}"
-                )
+                logger.info(f"Prompts file not found, returning empty state: {self.prompts_file}")
                 return AppState.empty()
 
             with open(self.prompts_file, "r", encoding="utf-8") as f:
@@ -191,9 +188,7 @@ class DataService:
         try:
             if backup_file is None:
                 # 最新のバックアップを探す
-                backups = sorted(
-                    self.backup_dir.glob("prompts_backup_*.json"), reverse=True
-                )
+                backups = sorted(self.backup_dir.glob("prompts_backup_*.json"), reverse=True)
                 if not backups:
                     logger.warning("No backup files found")
                     return False

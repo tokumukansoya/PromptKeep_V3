@@ -6,9 +6,23 @@ Flet 0.28.3、Python 3.14.2 対応。
 
 
 class PromptKeeperError(Exception):
-    """PromptKeep 全体の基底例外。"""
+    """PromptKeep 全体の基底例外。
 
-    pass
+    Attributes:
+        message: 開発者向けエラーメッセージ
+        user_message: ユーザー向け表示メッセージ（UI通知用）
+    """
+
+    def __init__(self, message: str, user_message: str | None = None):
+        """例外を初期化。
+
+        Args:
+            message: 開発者向けエラーメッセージ（ログ記録用）
+            user_message: ユーザー向けメッセージ（省略時はmessageを使用）
+        """
+        self.message = message
+        self.user_message = user_message or message
+        super().__init__(message)
 
 
 class PromptNotFoundError(PromptKeeperError):
@@ -29,7 +43,13 @@ class InvalidCategoryDepthError(PromptKeeperError):
     config.MAX_CATEGORY_DEPTH を超える場合に発生。
     """
 
-    pass
+    def __init__(self, current_depth: int, max_depth: int = 3):
+        super().__init__(
+            f"Category depth {current_depth} exceeds maximum {max_depth}",
+            user_message=f"カテゴリは最大{max_depth}階層までです",
+        )
+        self.current_depth = current_depth
+        self.max_depth = max_depth
 
 
 class DataPersistenceError(PromptKeeperError):
@@ -38,7 +58,13 @@ class DataPersistenceError(PromptKeeperError):
     JSON の読み込み・書き込み失敗時に発生。
     """
 
-    pass
+    def __init__(self, operation: str, reason: str):
+        super().__init__(
+            f"Data persistence failed during {operation}: {reason}",
+            user_message="データの保存に失敗しました。変更が失われる可能性があります。",
+        )
+        self.operation = operation
+        self.reason = reason
 
 
 class InvalidDataError(PromptKeeperError):

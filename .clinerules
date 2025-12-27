@@ -1,0 +1,496 @@
+# Roo Code / Cline ルール設定 - PromptKeep
+
+## 🎯 プロジェクト概要
+- **プロジェクト名**: PromptKeep
+- **種類**: Flet製デスクトップアプリケーション
+- **開発方針**: ドキュメント駆動開発（**ドキュメント先行**）
+- **Python**: 3.14.2
+- **Flet**: 0.28.3
+- **パッケージ管理**: uv
+- **ロギング**: Loguru
+- **Linter/Formatter**: Ruff
+
+---
+
+## � ドキュメント駆動開発ルール（必須遵守）
+
+### 原則: ドキュメントファースト
+
+**新機能追加・仕様変更の場合、必ず以下の順序で実施する：**
+
+```
+1. 📝 ドキュメントを先に更新
+   ↓
+2. 📝 Gitコミット（docs: …）
+   ↓
+3. 🔧 コードを実装
+   ↓
+4. 📝 Gitコミット（feat/fix: …）
+```
+
+### 更新対象ドキュメント
+
+#### 機能追加時
+- [ ] `docs/requirements.md` - 機能要件を追加
+- [ ] `docs/architecture.md` - 必要ならクラス設計を追加
+- [ ] `docs/implementation_plan.md` - Phaseを追加
+- [ ] `docs/ai_execution_guide.md` - 実行コマンドを追加
+
+#### 仕様変更時
+- [ ] 該当ドキュメントの該当箇所を修正
+- [ ] 関連する他ドキュメントも確認・修正
+
+#### バグ修正時
+- ドキュメント更新は不要（仕様通りなら）
+- 仕様誤りの場合はドキュメントを修正
+
+### ドキュメント更新の例
+
+```markdown
+## 例: 「タグ機能」を追加する場合
+
+### Step 1: ドキュメント更新
+
+1. docs/requirements.md
+   - 「5.X タグ機能」セクションを追加
+   - データモデルに tags フィールドを追加
+
+2. docs/architecture.md
+   - models/tag.py を追加
+   - services/tag_service.py を追加
+
+3. docs/implementation_plan.md
+   - Phase 13: タグ機能 を追加
+
+4. docs/ai_execution_guide.md
+   - Phase 13 の実行コマンドを追加
+
+5. Gitコミット
+git add docs/
+git commit -m "docs: タグ機能の要件定義を追加"
+
+### Step 2: コード実装
+
+1. models/tag.py を作成
+2. services/tag_service.py を作成
+3. UIコンポーネントを作成
+
+4. Gitコミット
+git add models/ services/ ui/
+git commit -m "feat: Phase 13 タグ機能実装完了"
+```
+
+### 禁止事項
+
+❌ **ドキュメント未更新でコードを先に書く**
+❌ **ドキュメントとコードが矛盾する**
+❌ **変更後にドキュメントを更新し忘れる**
+
+---
+
+## �📚 必須確認ドキュメント（実行前に必読）
+
+実装を開始する前に、以下のドキュメントを**必ず**確認してください：
+
+1. **[docs/ai_execution_guide.md](docs/ai_execution_guide.md)** ⭐️ 最優先
+   - Phase別の完全な実行コマンド
+   - 検証可能な成功基準チェックリスト
+   
+2. **[docs/coding_style.md](docs/coding_style.md)** 
+   - コーディング規約（型ヒント、Docstring必須）
+   
+3. **[docs/requirements.md](docs/requirements.md)**
+   - 機能要件、データ制約
+   
+4. **[docs/architecture.md](docs/architecture.md)**
+   - ディレクトリ構造、クラス設計
+
+---
+
+## 🔧 環境管理ルール
+
+### パッケージ管理: uv
+
+```bash
+# パッケージのインストール
+uv add <package-name>
+
+# 例: Loguru追加済み
+uv add loguru
+
+# 開発用パッケージのインストール
+uv add --dev <package-name>
+
+# 依存関係の同期
+uv sync
+
+# Python環境の実行
+uv run python main.py
+```
+
+**禁止事項**:
+- ❌ `pip install` を使用しない
+- ❌ `pip freeze > requirements.txt` を実行しない
+- ✅ すべてのパッケージ追加は `uv add` で行う
+
+---
+
+## 🎨 コーディング規約（必須遵守）
+
+### 型ヒント
+- すべての関数・メソッドに型ヒントを付ける
+- `Optional`, `Union`, `List`, `Dict` などを明示
+
+```python
+from typing import Optional, List
+
+def create_prompt(
+    title: str,
+    body: str,
+    category_ids: List[str]  # カテゴリIDの階層（IDベース）
+) -> Prompt:
+    ...
+```
+
+### Docstring
+- Google Style で記述
+- すべての関数・クラスに必須
+
+```python
+def update_prompt(prompt_id: str, title: Optional[str] = None) -> Prompt:
+    """プロンプトを更新する。
+    
+    Args:
+        prompt_id: 更新対象のプロンプトID
+        title: 新しいタイトル（Noneの場合は更新しない）
+    
+    Returns:
+        更新されたPromptオブジェクト
+    
+    Raises:
+        PromptNotFoundError: プロンプトが存在しない場合
+    """
+    ...
+```
+
+### ファイル構成
+```python
+"""モジュールの説明（1行）
+
+詳細な説明（必要に応じて）
+"""
+
+# 1. 標準ライブラリ
+import json
+from datetime import datetime
+from typing import List, Optional
+
+# 2. サードパーティ
+import flet as ft
+
+# 3. ローカルモジュール
+from models.prompt import Prompt
+from services.data_service import DataService
+```
+
+### 定数
+- `config.py` から読み込む
+- ファイル内でハードコードしない
+
+```python
+from config import MAX_CATEGORY_DEPTH, CARD_WIDTH
+
+# NG: CARD_WIDTH = 200
+# OK: from config import CARD_WIDTH
+```
+
+---
+
+## 📁 ディレクトリ構造ルール
+
+```
+PromptKeep_V3/
+├── models/           # データモデル（データクラスのみ）
+├── services/         # ビジネスロジック（UI非依存）
+├── ui/
+│   ├── components/   # 再利用可能なUIパーツ
+│   ├── views/        # 画面レイアウト
+│   ├── controllers/  # イベントハンドリング
+│   └── styles/       # スタイル定数
+└── utils/            # ユーティリティ
+```
+
+**ルール**:
+- models/ にはビジネスロジックを書かない
+- services/ にはUIコードを書かない
+- ui/components/ は独立した小さなコンポーネント
+- ui/controllers/ がservices/を呼び出す
+
+---
+
+## 🔄 Git 運用ルール
+
+### Phase別ブランチ戦略
+
+```bash
+# Phase開始時
+git checkout main
+git pull origin main
+git checkout -b phase-N-description
+
+# 実装中（小まめにコミット）
+git add <files>
+git commit -m "feat: Phase N-X 説明"
+
+# Phase完了時
+git checkout main
+git merge phase-N-description
+git push origin main
+git branch -d phase-N-description
+```
+
+### コミットタイミング（必須）
+
+**コミットすべきタイミング**:
+1. ✅ 1つのファイル/コンポーネントの実装完了時
+2. ✅ 1つのPhaseのサブタスク完了時
+3. ✅ 動作確認が完了した時
+4. ✅ テストが成功した時
+
+**コミットすべきでないタイミング**:
+1. ❌ エラーが残っている状態
+2. ❌ 未完成のコード
+3. ❌ コメントアウトされたコードが大量にある
+
+### コミットメッセージ規則
+
+```bash
+# 形式
+<type>: <description>
+
+# 例
+feat: Phase 4-1 CardBody コンポーネント実装
+fix: CategoryService の階層検証バグ修正
+docs: ai_execution_guide.md に Phase 5 を追加
+style: CardHeader のスタイル調整
+refactor: PromptService のエラーハンドリング改善
+test: SearchService のユニットテスト追加
+```
+
+**type一覧**:
+- `feat`: 新機能
+- `fix`: バグ修正
+- `docs`: ドキュメント変更
+- `style`: コードスタイル変更（動作に影響なし）
+- `refactor`: リファクタリング
+- `test`: テスト追加・変更
+- `chore`: ビルド・環境設定など
+
+### 実装中のGit操作フロー
+
+```bash
+# 1. Phase開始
+git checkout -b phase-4-card-ui
+
+# 2. CardBody 実装完了
+git add ui/components/card/card_body.py
+git commit -m "feat: Phase 4-1 CardBody コンポーネント実装"
+
+# 3. CardHeader 実装完了
+git add ui/components/card/card_header.py
+git commit -m "feat: Phase 4-2 CardHeader コンポーネント実装"
+
+# 4. PromptCard 実装完了
+git add ui/components/card/prompt_card.py
+git commit -m "feat: Phase 4-3 PromptCard コンポーネント実装"
+
+# 5. Phase 4 完了時
+git checkout main
+git merge phase-4-card-ui
+git push origin main
+```
+
+---
+
+## ⚠️ 実装時の注意事項
+
+### 1. バージョン固定（厳守）
+- Python: **3.14.2** のみ使用
+- Flet: **0.28.3** のみ使用
+- 他のバージョンのAPIは参照しない
+
+### 2. データ制約（厳守）
+- カテゴリ階層: **最大3階層**
+- プレビュー文字数: **40〜80文字**
+- カード形状: **正方形（width == height）**
+
+### 3. エラーハンドリング（必須）
+- すべての例外を適切に処理
+- `logger.error()` でログ出力
+- ユーザーにわかりやすいメッセージを表示
+
+### 4. 自動保存（デバウンス必須）
+- テキスト入力から **2〜3秒** デバウンス
+- `asyncio.sleep()` を使用
+
+---
+
+## 🚀 実装フロー
+
+### Phase実装の標準フロー
+
+```
+1. docs/ai_execution_guide.md で該当Phaseを確認
+   ↓
+2. 「🤖 AI実行コマンド」をコピー
+   ↓
+3. git checkout -b phase-N-description
+   ↓
+4. 実装開始
+   ↓
+5. 1つのファイル完成ごとに git commit
+   ↓
+6. 「✅ 成功確認チェックリスト」で検証
+   ↓
+7. すべて✅なら git checkout main && git merge
+   ↓
+8. 次のPhaseへ
+```
+
+### 実装前の確認事項
+
+- [ ] ai_execution_guide.md を確認した
+- [ ] coding_style.md を確認した
+- [ ] 依存するPhaseが完了している
+- [ ] gitブランチを作成した
+
+### 実装後の確認事項
+
+- [ ] 型ヒントが完備されている
+- [ ] Docstringが記載されている
+- [ ] エラーハンドリングが適切
+- [ ] logger.info/error() を使用している
+- [ ] config.py から定数を読み込んでいる
+- [ ] 成功確認チェックリストが全て✅
+- [ ] git commit を実行した
+
+---
+
+## 🔍 検証コマンド例
+
+### Ruff（Linter + Formatter）
+```bash
+# Lintチェック
+uv run ruff check .
+
+# フォーマットチェック
+uv run ruff format --check .
+
+# 自動修正
+uv run ruff check --fix .
+uv run ruff format .
+```
+
+### 型チェック
+```bash
+uv run mypy <file>.py
+```
+
+### コード実行
+```bash
+uv run python main.py
+```
+
+### テスト実行（実装後）
+```bash
+uv run pytest tests/
+```
+
+---
+
+## 📝 ログ出力ルール（Loguru使用）
+
+### インポート
+```python
+from loguru import logger
+```
+
+### ログレベル
+- `logger.debug()`: デバッグ情報
+- `logger.info()`: 通常の処理フロー（作成、更新、削除など）
+- `logger.warning()`: 警告（非推奨の使い方など）
+- `logger.error()`: エラー（例外発生時）
+- `logger.exception()`: エラー + スタックトレース
+
+### ログメッセージ
+```python
+from loguru import logger
+
+# Good
+logger.info(f"プロンプト作成成功: {prompt.id}")
+logger.error(f"カテゴリが見つかりません: {category_id}")
+
+# 例外キャッチ時
+try:
+    ...
+except Exception as e:
+    logger.exception("エラーが発生しました")  # スタックトレース自動表示
+
+# Bad
+logger.info("処理成功")  # 何の処理かわからない
+print("エラー")  # printは使わない
+```
+
+---
+
+## 🎯 実装優先度
+
+### Must（必須）
+- プロンプトCRUD
+- カード表示
+- カテゴリ管理（3階層）
+- お気に入り
+- コピー機能
+- ゴミ箱
+- アンドゥ（Ctrl+Z）
+- 自動保存
+
+### Should（重要）
+- カテゴリD&D
+- 検索・フィルタ
+
+### Could（任意）
+- 仮想スクロール
+- アニメーション
+
+---
+
+## 📞 問題発生時の対応
+
+### エラーが発生したら
+
+1. エラーメッセージを確認
+2. docs/coding_style.md の該当箇所を再確認
+3. docs/ai_execution_guide.md の該当Phaseを再確認
+4. 依存関係（Phase依存）を確認
+5. Flet 0.28.3 のAPIドキュメントを確認
+
+### わからないことがあったら
+
+1. docs/DOCUMENT_GUIDE.md を確認（各ドキュメントの役割説明）
+2. docs/requirements.md で仕様を確認
+3. docs/architecture.md で設計を確認
+
+---
+
+## 🎓 参考リンク
+
+- Flet 0.28.3 ドキュメント: https://flet.dev/docs/
+- Python 型ヒント: https://docs.python.org/ja/3/library/typing.html
+- Google Style Docstring: https://google.github.io/styleguide/pyguide.html
+
+---
+
+**最終更新**: 2025-12-27
+
+**このファイルを変更する際は**: 変更内容をチーム全体に共有してください。
