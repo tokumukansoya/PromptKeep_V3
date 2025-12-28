@@ -1,4 +1,7 @@
-"""プロンプトカードコンポーネント。"""
+"""プロンプトカードコンポーネント。
+
+プロンプトをカード形式で表示し、クリックやお気に入り操作を提供する。
+"""
 
 import flet as ft
 from typing import Callable, Optional
@@ -13,14 +16,18 @@ from ui.styles.colors import (
     FAVORITE_COLOR,
     FAVORITE_INACTIVE,
 )
-from ui.styles.spacing import BORDER_RADIUS_MD, PADDING_MD, CARD_GAP
+from ui.styles.spacing import BORDER_RADIUS_MD, PADDING_MD
 from ui.styles.typography import FONT_SIZE_TITLE, FONT_SIZE_BODY
 from ui.styles.card_style import CARD_WIDTH, CARD_HEIGHT
 from utils.text_utils import truncate_preview, truncate_title
 
 
 class PromptCard(ft.Container):
-    """プロンプトを表示するカードコンポーネント。"""
+    """プロンプトを表示するカードコンポーネント。
+
+    Attributes:
+        prompt: 表示するプロンプト
+    """
 
     def __init__(
         self,
@@ -29,7 +36,16 @@ class PromptCard(ft.Container):
         on_copy: Optional[Callable[[Prompt], None]] = None,
         on_favorite: Optional[Callable[[Prompt], None]] = None,
         on_delete: Optional[Callable[[Prompt], None]] = None,
-    ):
+    ) -> None:
+        """初期化。
+
+        Args:
+            prompt: 表示するプロンプト
+            on_click: カードクリック時のコールバック
+            on_copy: コピー時のコールバック
+            on_favorite: お気に入り切り替え時のコールバック
+            on_delete: 削除時のコールバック
+        """
         self.prompt = prompt
         self._on_click = on_click
         self._on_copy = on_copy

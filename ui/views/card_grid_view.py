@@ -1,4 +1,7 @@
-"""カードグリッドビュー。"""
+"""カードグリッドビュー。
+
+プロンプトカードをグリッドレイアウトで表示するビュー。
+"""
 
 import flet as ft
 from typing import Callable, List, Optional
@@ -9,7 +12,11 @@ from ui.styles.spacing import CARD_GAP, PADDING_MD
 
 
 class CardGridView(ft.Container):
-    """プロンプトカードをグリッド表示するビュー。"""
+    """プロンプトカードをグリッド表示するビュー。
+
+    Attributes:
+        prompts: 表示するプロンプトのリスト
+    """
 
     def __init__(
         self,
@@ -18,7 +25,16 @@ class CardGridView(ft.Container):
         on_copy: Optional[Callable[[Prompt], None]] = None,
         on_favorite: Optional[Callable[[Prompt], None]] = None,
         on_delete: Optional[Callable[[Prompt], None]] = None,
-    ):
+    ) -> None:
+        """初期化。
+
+        Args:
+            prompts: 表示するプロンプトのリスト
+            on_card_click: カードクリック時のコールバック
+            on_copy: コピー時のコールバック
+            on_favorite: お気に入り切り替え時のコールバック
+            on_delete: 削除時のコールバック
+        """
         self.prompts = prompts
         self._on_card_click = on_card_click
         self._on_copy = on_copy

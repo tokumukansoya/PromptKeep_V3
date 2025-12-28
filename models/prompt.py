@@ -1,4 +1,7 @@
-"""プロンプトモデル。"""
+"""プロンプトモデル。
+
+プロンプトのデータ構造とシリアライズ処理を定義する。
+"""
 
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -8,7 +11,18 @@ import uuid
 
 @dataclass
 class Prompt:
-    """プロンプトを表すデータクラス。"""
+    """プロンプトを表すデータクラス。
+
+    Attributes:
+        id: ユニークID（UUID）
+        title: プロンプトのタイトル
+        body: プロンプトの本文
+        category_ids: 所属カテゴリIDのリスト
+        favorite: お気に入りフラグ
+        deleted_at: 削除日時（Noneなら未削除）
+        created_at: 作成日時
+        updated_at: 更新日時
+    """
 
     id: str
     title: str
@@ -20,8 +34,22 @@ class Prompt:
     updated_at: datetime = field(default_factory=datetime.now)
 
     @classmethod
-    def create(cls, title: str, body: str, category_ids: Optional[List[str]] = None) -> "Prompt":
-        """新しいプロンプトを作成する。"""
+    def create(
+        cls,
+        title: str,
+        body: str,
+        category_ids: Optional[List[str]] = None,
+    ) -> "Prompt":
+        """新しいプロンプトを作成する。
+
+        Args:
+            title: プロンプトのタイトル
+            body: プロンプトの本文
+            category_ids: 所属カテゴリIDのリスト
+
+        Returns:
+            新規作成されたプロンプト
+        """
         now = datetime.now()
         return cls(
             id=str(uuid.uuid4()),

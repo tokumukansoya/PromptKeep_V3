@@ -1,4 +1,7 @@
-"""プロンプト編集ビュー。"""
+"""プロンプト編集ビュー。
+
+プロンプトの新規作成・編集画面を提供する。
+"""
 
 import flet as ft
 from typing import Callable, List, Optional
@@ -12,21 +15,39 @@ from ui.styles.colors import (
     BORDER_COLOR,
     ACCENT_PRIMARY,
 )
-from ui.styles.spacing import PADDING_MD, PADDING_LG, BORDER_RADIUS_MD
+from ui.styles.spacing import PADDING_LG, BORDER_RADIUS_MD
 from ui.styles.typography import FONT_SIZE_H2
 
 
 class EditView(ft.Container):
-    """プロンプト編集ビュー。"""
+    """プロンプト編集ビュー。
+
+    タイトル、本文、カテゴリの編集機能を提供する。
+    未保存変更がある場合は確認ダイアログを表示する。
+
+    Attributes:
+        prompt: 編集対象のプロンプト（新規の場合はNone）
+        categories: 選択可能なカテゴリのリスト
+        is_new: 新規作成モードかどうか
+    """
 
     def __init__(
         self,
         prompt: Optional[Prompt] = None,
-        categories: List[Category] = None,
+        categories: Optional[List[Category]] = None,
         on_save: Optional[Callable[[str, str, List[str]], None]] = None,
         on_cancel: Optional[Callable[[], None]] = None,
         is_new: bool = False,
-    ):
+    ) -> None:
+        """初期化。
+
+        Args:
+            prompt: 編集対象のプロンプト（新規の場合はNone）
+            categories: 選択可能なカテゴリのリスト
+            on_save: 保存時のコールバック（title, body, category_ids）
+            on_cancel: キャンセル時のコールバック
+            is_new: 新規作成モードかどうか
+        """
         self.prompt = prompt
         self.categories = categories or []
         self._on_save = on_save

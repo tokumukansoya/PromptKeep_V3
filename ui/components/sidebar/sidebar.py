@@ -1,7 +1,11 @@
-"""サイドバーコンポーネント。"""
+"""サイドバーコンポーネント。
+
+ナビゲーション用のサイドバーを提供する。
+カテゴリ選択、お気に入り、ゴミ箱へのナビゲーションを含む。
+"""
 
 import flet as ft
-from typing import Callable, Optional, List
+from typing import Callable, Optional, List, Dict
 
 from models.category import Category
 from ui.styles.colors import (
@@ -17,7 +21,11 @@ from ui.styles.typography import FONT_SIZE_BODY, FONT_SIZE_SM
 
 
 class SidebarItem(ft.Container):
-    """サイドバーの項目。"""
+    """サイドバーの単一項目。
+
+    Attributes:
+        _selected: 選択状態
+    """
 
     def __init__(
         self,
@@ -26,7 +34,16 @@ class SidebarItem(ft.Container):
         selected: bool = False,
         on_click: Optional[Callable[[], None]] = None,
         badge_count: int = 0,
-    ):
+    ) -> None:
+        """初期化。
+
+        Args:
+            icon: アイコン名
+            text: 表示テキスト
+            selected: 選択状態
+            on_click: クリック時のコールバック
+            badge_count: バッジに表示する数値
+        """
         self._selected = selected
         self._on_click_callback = on_click
 
@@ -63,23 +80,33 @@ class SidebarItem(ft.Container):
         )
 
     def _handle_click(self, e: ft.ControlEvent) -> None:
+        """クリックイベントを処理する。"""
         if self._on_click_callback:
             self._on_click_callback()
 
     def _handle_hover(self, e: ft.ControlEvent) -> None:
+        """ホバーイベントを処理する。"""
         if not self._selected:
-            self.bgcolor = SIDEBAR_ITEM_HOVER if e.data == "true" else None
+            is_hovered = e.data == "true"
+            self.bgcolor = SIDEBAR_ITEM_HOVER if is_hovered else None
             self.update()
 
 
 class Sidebar(ft.Container):
-    """サイドバー全体のコンポーネント。"""
+    """サイドバー全体のコンポーネント。
+
+    カテゴリ一覧、お気に入り、ゴミ箱へのナビゲーションを提供する。
+
+    Attributes:
+        categories: カテゴリのリスト
+        view_mode: 現在のビューモード
+    """
 
     def __init__(
         self,
         categories: List[Category],
         selected_category_id: Optional[str],
-        prompt_counts: dict,
+        prompt_counts: Dict[str, int],
         on_category_select: Optional[Callable[[Optional[str]], None]] = None,
         on_add_category: Optional[Callable[[], None]] = None,
         on_delete_category: Optional[Callable[[Category], None]] = None,

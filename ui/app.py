@@ -1,12 +1,14 @@
-"""PromptKeep アプリケーション。"""
+"""PromptKeep アプリケーション。
+
+メインアプリケーションクラスとUI構築を担当。
+"""
 
 import flet as ft
-from flet import Page, ThemeMode, ScrollMode
+from flet import Page, ThemeMode
 from typing import Optional, List
 
 from models.prompt import Prompt
 from models.category import Category
-from models.app_state import AppState
 from services.data_service import DataService
 from services.state_manager import StateManager
 from services.prompt_service import PromptService
@@ -16,20 +18,38 @@ from ui.views.card_grid_view import CardGridView
 from ui.views.edit_view import EditView
 from ui.views.trash_view import TrashView
 from ui.styles.colors import DARK_BG_PRIMARY, DARK_BG_SECONDARY, TEXT_PRIMARY, ACCENT_PRIMARY
-from ui.styles.spacing import SIDEBAR_WIDTH
 from utils.logger import logger
 
 
-class PromptKeepApp:
-    """PromptKeep アプリケーションクラス。"""
+# ビューモード定数
+VIEW_MODE_ALL = "all"
+VIEW_MODE_FAVORITES = "favorites"
+VIEW_MODE_TRASH = "trash"
+VIEW_MODE_CATEGORY = "category"
 
-    def __init__(self):
+
+class PromptKeepApp:
+    """PromptKeep アプリケーションクラス。
+
+    プロンプト管理アプリのメインエントリーポイント。
+    UIの構築、イベントハンドリング、状態管理を統括する。
+
+    Attributes:
+        title: ウィンドウタイトル
+        page: FletのPageインスタンス
+        view_mode: 現在のビューモード
+        is_editing: 編集モードかどうか
+    """
+
+    # ウィンドウ設定定数
+    WINDOW_WIDTH = 1200
+    WINDOW_HEIGHT = 800
+    MIN_WINDOW_WIDTH = 800
+    MIN_WINDOW_HEIGHT = 600
+
+    def __init__(self) -> None:
         """アプリケーションの初期化。"""
         self.title = "PromptKeep"
-        self.window_width = 1200
-        self.window_height = 800
-        self.min_window_width = 800
-        self.min_window_height = 600
 
         # サービス初期化
         self.data_service = DataService()
@@ -37,53 +57,59 @@ class PromptKeepApp:
         self.prompt_service = PromptService()
         self.category_service = CategoryService()
 
-        # 状態
-        self.view_mode = "all"  # "all", "favorites", "trash", "category"
+        # UI状態
+        self.view_mode = VIEW_MODE_ALL
         self.editing_prompt: Optional[Prompt] = None
         self.is_editing = False
         self.page: Optional[Page] = None
-        self.search_query = ""  # 検索クエリをローカルに保持
+        self.search_query = ""
 
-    def run(self):
-        """アプリケーションを起動する。"""
+    def run(self) -> None:
+        """Fletアプリケーションを起動する。"""
 
-        def main(page: Page):
+        def on_page_load(page: Page) -> None:
+            """ページ読み込み時の初期化処理。"""
             self.page = page
-
-            # ウィンドウ設定
-            page.title = self.title
-            page.window.width = self.window_width
-            page.window.height = self.window_height
-            page.window.min_width = self.min_window_width
-            page.window.min_height = self.min_window_height
-
-            # ダークテーマ固定
-            page.theme_mode = ThemeMode.DARK
-            page.bgcolor = DARK_BG_PRIMARY
-
-            # テーマ設定
-            page.theme = ft.Theme(
-                color_scheme_seed=ft.Colors.BLUE,
-                visual_density=ft.VisualDensity.COMFORTABLE,
-            )
-
-            page.padding = 0
-            page.spacing = 0
-
-            # データ読み込み
-            try:
-                self.state_manager.load()
-                logger.info("Data loaded successfully")
-            except Exception as e:
-                logger.error(f"Failed to load data: {e}")
-
-            # リスナー登録
-            self.state_manager.add_listener(lambda _: self._refresh_ui())
-
-            # UI構築
+            self._configure_window(page)
+            self._load_data()
+            self._setup_listeners()
             self._build_ui()
 
-        ft.app(target=main, view=ft.AppView.WEB_BROWSER)
+        ft.app(target=on_page_load, view=ft.AppView.WEB_BROWSER)
+
+    def _configure_window(self, page: Page) -> None:
+        """ウィンドウを設定する。
+
+        Args:
+            page: FletのPageインスタンス
+        """
+        page.title = self.title
+        page.window.width = self.WINDOW_WIDTH
+        page.window.height = self.WINDOW_HEIGHT
+        page.window.min_width = self.MIN_WINDOW_WIDTH
+        page.window.min_height = self.MIN_WINDOW_HEIGHT
+
+        # ダークテーマ固定
+        page.theme_mode = ThemeMode.DARK
+        page.bgcolor = DARK_BG_PRIMARY
+        page.theme = ft.Theme(
+            color_scheme_seed=ft.Colors.BLUE,
+            visual_density=ft.VisualDensity.COMFORTABLE,
+        )
+        page.padding = 0
+        page.spacing = 0
+
+    def _load_data(self) -> None:
+        """データを読み込む。"""
+        try:
+            self.state_manager.load()
+            logger.info("Data loaded successfully")
+        except Exception as e:
+            logger.error(f"Failed to load data: {e}")
+
+    def _setup_listeners(self) -> None:
+        """イベントリスナーを設定する。"""
+        self.state_manager.add_listener(lambda _: self._refresh_ui())
 
     def _build_ui(self) -> None:
         """UIを構築する。"""
@@ -182,16 +208,21 @@ class PromptKeepApp:
         )
 
     def _build_header(self) -> ft.Container:
-        """ヘッダーを構築する。"""
+        """ヘッダーを構築する。
+
+        Returns:
+            ヘッダーのコンテナ
+        """
         state = self.state_manager.state
 
-        # タイトル
-        if self.view_mode == "all":
-            title = "すべてのプロンプト"
-        elif self.view_mode == "favorites":
-            title = "お気に入り"
-        elif self.view_mode == "trash":
-            title = "ゴミ箱"
+        # タイトルの決定
+        title_map = {
+            VIEW_MODE_ALL: "すべてのプロンプト",
+            VIEW_MODE_FAVORITES: "お気に入り",
+            VIEW_MODE_TRASH: "ゴミ箱",
+        }
+        if self.view_mode in title_map:
+            title = title_map[self.view_mode]
         else:
             category = state.get_category_by_id(state.selected_category_id)
             title = category.name if category else "プロンプト"
@@ -221,7 +252,7 @@ class PromptKeepApp:
         ]
 
         # ゴミ箱以外のビューでは新規作成ボタンを表示
-        if self.view_mode != "trash":
+        if self.view_mode != VIEW_MODE_TRASH:
             controls.append(ft.Container(width=16))
             controls.append(
                 ft.ElevatedButton(
@@ -248,14 +279,19 @@ class PromptKeepApp:
         )
 
     def _get_filtered_prompts(self) -> List[Prompt]:
-        """現在のビューモードに応じたプロンプトを取得する。"""
+        """現在のビューモードに応じたプロンプトを取得する。
+
+        Returns:
+            フィルタリング済みのプロンプトリスト
+        """
         state = self.state_manager.state
 
-        if self.view_mode == "all":
+        # ビューモードに応じたプロンプト取得
+        if self.view_mode == VIEW_MODE_ALL:
             prompts = state.get_active_prompts()
-        elif self.view_mode == "favorites":
+        elif self.view_mode == VIEW_MODE_FAVORITES:
             prompts = state.get_favorite_prompts()
-        elif self.view_mode == "trash":
+        elif self.view_mode == VIEW_MODE_TRASH:
             prompts = state.get_trashed_prompts()
         else:
             prompts = state.get_prompts_by_category(state.selected_category_id)
@@ -270,28 +306,32 @@ class PromptKeepApp:
         """UIを再描画する。"""
         self._build_ui()
 
-    # イベントハンドラ
+    # ナビゲーションイベントハンドラ
     def _show_all(self) -> None:
         """すべてのプロンプトを表示する。"""
-        self.view_mode = "all"
+        self.view_mode = VIEW_MODE_ALL
         self.state_manager.select_category(None)
         self._refresh_ui()
 
     def _show_favorites(self) -> None:
         """お気に入りを表示する。"""
-        self.view_mode = "favorites"
+        self.view_mode = VIEW_MODE_FAVORITES
         self.state_manager.select_category(None)
         self._refresh_ui()
 
     def _show_trash(self) -> None:
         """ゴミ箱を表示する。"""
-        self.view_mode = "trash"
+        self.view_mode = VIEW_MODE_TRASH
         self.state_manager.select_category(None)
         self._refresh_ui()
 
     def _select_category(self, category_id: str) -> None:
-        """カテゴリを選択する。"""
-        self.view_mode = "category"
+        """カテゴリを選択する。
+
+        Args:
+            category_id: 選択するカテゴリID
+        """
+        self.view_mode = VIEW_MODE_CATEGORY
         self.state_manager.select_category(category_id)
         self._refresh_ui()
 
@@ -493,7 +533,7 @@ class PromptKeepApp:
             self.state_manager.remove_category(category.id)
             # 選択中のカテゴリだった場合は「すべて」に戻る
             if self.state_manager.state.selected_category_id == category.id:
-                self.view_mode = "all"
+                self.view_mode = VIEW_MODE_ALL
                 self.state_manager.select_category(None)
             self._show_snackbar("カテゴリを削除しました")
 

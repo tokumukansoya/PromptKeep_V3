@@ -1,4 +1,7 @@
-"""アプリケーション状態モデル。"""
+"""アプリケーション状態モデル。
+
+アプリケーション全体の状態を保持し、フィルタリングヘルパーを提供する。
+"""
 
 from dataclasses import dataclass, field
 from typing import List, Optional
@@ -9,7 +12,15 @@ from models.category import Category
 
 @dataclass
 class AppState:
-    """アプリケーション全体の状態を保持するデータクラス。"""
+    """アプリケーション全体の状態を保持するデータクラス。
+
+    Attributes:
+        prompts: プロンプトのリスト
+        categories: カテゴリのリスト
+        selected_category_id: 選択中のカテゴリID
+        search_query: 検索クエリ
+        current_editing_id: 編集中のプロンプトID
+    """
 
     prompts: List[Prompt] = field(default_factory=list)
     categories: List[Category] = field(default_factory=list)

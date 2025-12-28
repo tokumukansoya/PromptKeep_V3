@@ -1,4 +1,7 @@
-"""状態管理サービス。"""
+"""状態管理サービス。
+
+アプリケーションの状態を一元管理し、デバウンス付き自動保存を提供する。
+"""
 
 import asyncio
 from typing import Callable, List, Optional
@@ -10,19 +13,36 @@ from services.data_service import DataService
 from config import DEBOUNCE_SECONDS
 from utils.logger import logger
 
+# 型エイリアス
+StateListener = Callable[[AppState], None]
+
 
 class StateManager:
-    """アプリケーション状態を管理するクラス。
+    """Singleton的なアプリケーション状態管理クラス。
 
     全ての状態変更はこのクラスを経由する。
     デバウンス付き自動保存機能を提供。
+
+    Attributes:
+        data_service: データ永続化サービス
+        debounce_seconds: 保存デバウンス時間（秒）
     """
 
-    def __init__(self, data_service: DataService, debounce_seconds: float = DEBOUNCE_SECONDS):
+    def __init__(
+        self,
+        data_service: DataService,
+        debounce_seconds: float = DEBOUNCE_SECONDS,
+    ) -> None:
+        """初期化。
+
+        Args:
+            data_service: データ永続化サービス
+            debounce_seconds: 保存デバウンス時間
+        """
         self.data_service = data_service
         self.debounce_seconds = debounce_seconds
         self._state: AppState = AppState.empty()
-        self._listeners: List[Callable[[AppState], None]] = []
+        self._listeners: List[StateListener] = []
         self._save_task: Optional[asyncio.Task] = None
 
     @property
@@ -30,12 +50,20 @@ class StateManager:
         """現在の状態を取得する。"""
         return self._state
 
-    def add_listener(self, listener: Callable[[AppState], None]) -> None:
-        """状態変更時のリスナーを追加する。"""
+    def add_listener(self, listener: StateListener) -> None:
+        """状態変更時のリスナーを追加する。
+
+        Args:
+            listener: 状態変更時に呼び出されるコールバック
+        """
         self._listeners.append(listener)
 
-    def remove_listener(self, listener: Callable[[AppState], None]) -> None:
-        """リスナーを削除する。"""
+    def remove_listener(self, listener: StateListener) -> None:
+        """リスナーを削除する。
+
+        Args:
+            listener: 削除するリスナー
+        """
         if listener in self._listeners:
             self._listeners.remove(listener)
 
