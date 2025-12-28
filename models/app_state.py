@@ -24,7 +24,6 @@ class AppState:
         selected_category_id: 選択中のカテゴリ ID（None = 全表示）。
         search_query: 検索クエリ。
         current_editing_id: 編集中のプロンプト ID（None = 編集なし）。
-        undo_stack: アンドゥ用のスタック（直前の状態を保持）。
 
     Note:
         - 状態更新はStateManagerを経由して行う（直接変更禁止）。
@@ -38,7 +37,6 @@ class AppState:
     selected_category_id: Optional[str] = None
     search_query: str = ""
     current_editing_id: Optional[str] = None
-    undo_stack: List[dict] = field(default_factory=list)
 
     @staticmethod
     def empty() -> "AppState":
@@ -113,7 +111,7 @@ class AppState:
                 current_editing_id=metadata.get("current_editing_id"),
             )
         except (KeyError, ValueError, TypeError) as e:
-            raise ValueError(f"AppState の構築に失敗しました: {e}")
+            raise ValueError(f"AppState の構築に失敗しました: {e}") from e
 
     def get_prompt(self, prompt_id: str) -> Optional[Prompt]:
         """ID でプロンプトを取得。

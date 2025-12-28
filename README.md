@@ -1,421 +1,74 @@
 # PromptKeep
 
-プロンプトをローカルで安全に管理・閲覧・編集・コピーするシンプルなデスクトップアプリケーション。
+PromptKeep is a simple desktop application for securely managing, viewing, editing, and copying AI prompts locally.
 
-**Version**: 1.0.0  
-**Status**: 開発中（データ層・ビジネスロジック層完成、UI 実装予定）
-
----
-
-## 🎯 ドキュメント駆動開発
-
-このプロジェクトは **ドキュメント駆動開発** で進めています。
-
-### 📚 ドキュメント構成
-
-```
-docs/
-├── 🔴 必読（人間向け）
-│   ├── QUICKSTART.md        # 開発者向けクイックスタート（5分で読める）
-│   ├── architecture.md      # 設計・構造
-│   └── coding_style.md      # コーディング規約
-│
-├── 📖 参照用
-│   ├── requirements.md      # 機能要件の詳細
-│   ├── implementation_plan.md # Phase別計画
-│   └── git_workflow.md      # Git運用詳細
-│
-├── 🤖 AI専用
-│   ├── ai_execution_guide.md # AI向け実装コマンド
-│   └── ai_prompts.md        # AI向けプロンプト集
-│
-├── 🔧 技術参考
-│   ├── ASYNC_GUIDELINES.md  # 非同期処理ガイド
-│   ├── FLET_FEATURE_COMPATIBILITY.md # Flet機能検証
-│   └── PHASE_0.5_DEV_TOOLS.md # 開発ツールセットアップ
-│
-└── 📦 archive/              # 過去の調査記録
-```
-
-### 👤 人間の開発者は？
-
-**[docs/QUICKSTART.md](docs/QUICKSTART.md)** を読んでください（5分で読めます）。
-
-### 🤖 AI（Roo Code/Copilot）は？
-
-**[docs/ai_execution_guide.md](docs/ai_execution_guide.md)** を参照してください。
+Version: 1.0.0
+Status: WIP
 
 ---
 
-## 概要
+## Document-Driven Development (DDD)
 
-PromptKeep は、AI プロンプトを効率的に管理するために設計されたデスクトップアプリです。
+This project follows Document-Driven Development. Documentation must be updated before or together with code changes.
 
-**主な機能:**
-- 📝 プロンプト作成・編集・削除
-- 🏷️ 階層カテゴリ（最大 3 階層）による整理
-- ⭐ お気に入り機能
-- 📋 プロンプト内容のワンクリックコピー
-- 🗑️ ゴミ箱機能（復元可能）
-- ↩️ Ctrl+Z アンドゥ機能
-- 🔍 タイトル・本文での検索
+Key points:
 
-**技術スタック:**
-- Python 3.14.2
-- Flet 0.28.3（UI フレームワーク）
-- uv（パッケージ管理）
-- Ruff（Linter/Formatter）
-- Loguru（ロギング）
-- JSON（ローカルデータ永続化）
+- Edit the relevant documentation in `docs/` and commit with the prefix `docs:` before implementing code.
+- Implement code and commit using Conventional Commits (e.g. `feat:`, `fix:`).
+- Pull Requests should include documentation updates and tests.
+
+See: [`docs/DOCUMENT_GUIDE.md`](PromptKeep_V3/docs/DOCUMENT_GUIDE.md:1) and [`docs/CI.md`](PromptKeep_V3/docs/CI.md:1).
 
 ---
 
-## セットアップ
+## Continuous Integration
 
-### 前提条件
-- Python 3.14.2 以上
-- pip
+This repository uses GitHub Actions to enforce linting, tests, and a docs-first check. See [`docs/CI.md`](PromptKeep_V3/docs/CI.md:1) for details and the workflow template at `.github/workflows/ci.yml`.
 
-### インストール手順
+Badges:
 
-```bash
-# リポジトリをクローン
-cd PromptKeep_V3
-
-# uvのインストール（まだの場合）
-# macOS/Linux:
-curl -LsSf https://astral.sh/uv/install.sh | sh
-# Windows:
-powershell -c "irm https://astral.sh/uv/install.ps1 | iex"
-
-# 依存関係のインストール
-uv sync
-```
-
-### アプリケーション起動
-
-```bash
-# アプリケーションを起動
-uv run python main.py
-
-# または開発モードで起動
-uv run flet run main.py
-```
+[![CI](https://github.com/soya/PromptKeep/actions/workflows/ci.yml/badge.svg)](https://github.com/soya/PromptKeep/actions)
+[![Coverage](https://img.shields.io/badge/coverage-unknown-lightgrey.svg)](https://github.com/soya/PromptKeep/actions)
 
 ---
 
-## ディレクトリ構成
+## Quick setup
 
-```
-PromptKeep_V3/
-├── main.py                          # アプリケーション エントリーポイント
-├── config.py                        # アプリケーション設定定数
-├── requirements.txt                 # 依存パッケージ
-├── exceptions.py                    # カスタム例外クラス
-│
-├── data/                            # データディレクトリ（自動生成）
-│   ├── prompts.json                 # プロンプトデータ
-│   └── backup/                      # バックアップファイル
-│
-├── docs/                            # ドキュメント
-│   ├── requirements.md              # 要件定義
-│   ├── architecture.md              # アーキテクチャ設計
-│   ├── coding_style.md              # コーディング規約
-│   └── implementation_plan.md       # 実装計画（ロードマップ）
-│
-├── models/                          # データモデル層
-│   ├── prompt.py                    # Prompt クラス
-│   ├── category.py                  # Category クラス
-│   └── app_state.py                 # AppState（全体状態）
-│
-├── services/                        # ビジネスロジック層
-│   ├── data_service.py              # JSON 読み書き
-│   ├── prompt_service.py            # プロンプト CRUD
-│   ├── category_service.py          # カテゴリ CRUD（実装予定）
-│   ├── undo_service.py              # アンドゥ管理（実装予定）
-│   ├── clipboard_service.py         # クリップボード操作（実装予定）
-│   └── search_service.py            # 検索・フィルタ（実装予定）
-│
-├── ui/                              # UI 層（実装予定）
-│   ├── app.py                       # Flet アプリケーション
-│   │
-│   ├── views/                       # 画面・ビュー
-│   │   ├── main_view.py
-│   │   ├── card_grid_view.py
-│   │   ├── edit_view.py
-│   │   └── trash_view.py
-│   │
-│   ├── components/                  # UI コンポーネント
-│   │   ├── card/
-│   │   ├── sidebar/
-│   │   ├── editor/
-│   │   ├── dialogs/
-│   │   └── common/
-│   │
-│   ├── controllers/                 # UI イベントハンドラ
-│   │   ├── main_controller.py
-│   │   ├── card_controller.py
-│   │   ├── edit_controller.py
-│   │   └── keyboard_controller.py
-│   │
-│   └── styles/                      # UI スタイル定数
-│       ├── colors.py                # カラーパレット
-│       ├── typography.py            # フォント定義
-│       ├── spacing.py               # 余白・サイズング
-│       └── card_style.py            # カードスタイル
-│
-└── utils/                           # ユーティリティ関数
-    ├── text_utils.py                # テキスト処理
-    ├── date_utils.py                # 日時処理
-    └── file_utils.py                # ファイル操作
-```
+1. Clone the repository and change directory:
+
+   git clone <repo-url>
+   cd PromptKeep_V3
+
+2. Install uv (if needed) and sync dependencies:
+
+   # macOS / Linux
+   curl -LsSf https://astral.sh/uv/install.sh | sh
+
+   uv sync
+
+3. Run the app:
+
+   uv run python main.py
 
 ---
 
-## 実装ロードマップ
+## Project layout (short)
 
-| Phase | 機能 | ステータス | 予定 |
-|-------|------|----------|------|
-| **0** | 環境セットアップ、スケルトンコード | ✅ 完了 | — |
-| **1** | データモデル、AppState | ✅ 完了 | — |
-| **2** | ビジネスロジック（PromptService）| ✅ 完了 | — |
-| **3** | UI スタイル定義 | ✅ 完了 | — |
-| **4** | コアコンポーネント（カード表示）| ⏳ 実装予定 | Phase 5 に依存 |
-| **5** | 編集機能・自動保存 | ⏳ 実装予定 | Phase 4 に依存 |
-| **6** | カテゴリ管理（D&D）| ⏳ 実装予定 | Phase 5 に依存 |
-| **7** | メイン画面統合 | ⏳ 実装予定 | Phase 4-6 に依存 |
-| **8** | ゴミ箱機能 | ⏳ 実装予定 | Phase 7 に依存 |
-| **9** | キーボード操作（Ctrl+Z など） | ⏳ 実装予定 | Phase 7 に依存 |
-| **10** | 検索・フィルタ機能 | ⏳ 実装予定 | Phase 7 に依存 |
-| **11** | エラーハンドリング・ロギング | ⏳ 実装予定 | Phase 7 に依存 |
-| **12** | テスト・最適化 | ⏳ 実装予定 | 最終段階 |
-
-詳細は [docs/implementation_plan.md](docs/implementation_plan.md) を参照。
+- `main.py` — application entry
+- `PromptKeep_V3/models/` — data models (Prompt, Category)
+- `PromptKeep_V3/services/` — business logic
+- `PromptKeep_V3/ui/` — UI components
+- `docs/` — project documentation (read this first)
 
 ---
 
-## 開発者ガイド
+## Contribution checklist for PRs
 
-### ドキュメント参照順序
-
-1. **要件定義** → [docs/requirements.md](docs/requirements.md)
-   - 機能仕様、UI/UX 設計
-
-2. **アーキテクチャ** → [docs/architecture.md](docs/architecture.md)
-   - ディレクトリ構成、データフロー、クラス設計
-
-3. **コーディング規約** → [docs/coding_style.md](docs/coding_style.md)
-   - 型ヒント、Docstring、命名規則、バージョン厳守
-
-4. **実装計画** → [docs/implementation_plan.md](docs/implementation_plan.md)
-   - Phase ごとの実装内容、AI 指示テンプレート
-
-### AI に指示する際の方法
-
-#### ステップ 1: テンプレートを用意
-
-```markdown
-【Phase X: [フェーズ名] 実装】
-
-バージョン：
-- Python 3.14.2
-- Flet 0.28.3
-
-対象ファイル：
-- models/xxx.py
-- services/xxx.py
-- ...
-
-要件：
-- [実装内容]
-
-依存：Phase Y の完成を前提
-
-規約厳守事項：
-- 型ヒント：すべての関数に Optional/Union/List などを明記
-- Docstring：Google Style で記載
-- 定数：config.py または ui/styles/ に配置
-- エラー：logger.error() でコンソール出力
-- コメント：Docstring と明白でない処理のみ
-
-参考ドキュメント：
-- アーキテクチャ: docs/architecture.md
-- 要件定義: docs/requirements.md
-- コーディング規約: docs/coding_style.md
-- 実装計画: docs/implementation_plan.md
-```
-
-#### ステップ 2: 指示をコピペ
-
-テンプレートを Copilot / Roo Code にコピペして実行。
-
-#### ステップ 3: コード確認
-
-- [ ] 型ヒントが完全か
-- [ ] Docstring は Google Style か
-- [ ] エラーハンドリングと logger.error() の使用
-- [ ] 定数は config.py または ui/styles/ に配置されているか
-- [ ] Python 3.14.2、Flet 0.28.3 対応か
-
-#### ステップ 4: コードレビューチェックリスト
-
-[docs/coding_style.md](docs/coding_style.md) の「コードレビューチェックリスト」を参照。
-
-### ローカル開発フロー
-
-```bash
-# 1. ファイルを編集
-
-# 2. 現在の状態を確認
-uv run python main.py
-
-# 3. AI に指示（テンプレート使用）
-
-# 4. 生成されたコードをコミット
-```
+- [ ] Documentation updated (`docs/` or `README.md`) — required
+- [ ] Tests added/updated (`tests/`)
+- [ ] Linters & pre-commit pass locally
+- [ ] Commit messages follow Conventional Commits
 
 ---
 
-## トラブルシューティング
-
-### Python バージョンエラー
-
-**エラー:**
-```
-SystemExit: Python 3.14以上が必要です（現在: 3.x.x）
-```
-
-**原因:**
-- Python バージョンが 3.14 未満
-
-**対応:**
-```bash
-# Python 3.14.2 をインストール
-# https://www.python.org/downloads/
-
-# インストール後、バージョン確認
-python --version
-
-# uv環境を再構築
-uv sync
-```
-
-### Flet バージョンエラー
-
-**エラー:**
-```
-Flet version mismatch: expected 0.28.3, got X.X.X
-```
-
-**原因:**
-- Flet のバージョンが 0.28.3 以外
-
-**対応:**
-```bash
-# 正しいバージョンをインストール
-uv add flet==0.28.3
-
-# バージョン確認
-uv run python -c "import flet; print(flet.__version__)"
-```
-
-### ImportError: No module named 'flet'
-
-**原因:**
-- 依存パッケージがインストールされていない
-
-**対応:**
-```bash
-# 依存パッケージをインストール
-uv sync
-
-# 動作確認
-uv run python main.py
-```
-
-### JSON データ読み込みエラー
-
-**エラー:**
-```
-InvalidDataError: JSON の形式が不正です
-```
-
-**原因:**
-- `data/prompts.json` が破損している
-- 手動編集で不正な JSON 形式になっている
-
-**対応:**
-```bash
-# バックアップから復元
-uv run python -c "
-from services.data_service import DataService
-ds = DataService()
-ds.restore_from_backup()
-print('Restored from backup')
-"
-
-# または、古いファイルを削除して再作成
-rm data/prompts.json
-uv run python main.py
-```
-
-### ファイルパーミッションエラー
-
-**エラー:**
-```
-PermissionError: [Errno 13] Permission denied
-```
-
-**原因:**
-- `data/` ディレクトリが読み書き不可
-
-**対応:**
-```bash
-# Windows
-icacls data /grant %USERNAME%:F /t
-
-# macOS/Linux
-chmod -R u+w data/
-```
-
----
-
-## よくある質問
-
-**Q: UI はいつ実装されますか？**  
-A: 実装計画は [docs/implementation_plan.md](docs/implementation_plan.md) を参照。Phase 4 から UI 実装が始まります。
-
-**Q: AI に指示する際、何をコピペすればいい？**  
-A: 上記「AI に指示する際の方法」セクションのテンプレートを参照。
-
-**Q: ローカルデータ以外に保存できる？**  
-A: 現在は JSON ファイルのみ。クラウド連携は将来の検討対象。
-
-**Q: 既存のプロンプトをインポートできる？**  
-A: 現在は未実装。CSV/JSON インポート機能は Phase 検討予定。
-
----
-
-## ライセンス
-
-個人用プロジェクト。
-
----
-
-## サポート
-
-問題が発生した場合：
-
-1. [トラブルシューティング](#トラブルシューティング) を確認
-2. [docs/coding_style.md](docs/coding_style.md) のエラーハンドリング セクションを確認
-3. ログファイルを確認（コンソール出力）
-
----
-
-## 次のステップ
-
-- [ ] Phase 4 実装開始
-- [ ] AI に Phase 4 を指示
-- [ ] UI コンポーネントの完成
-- [ ] メイン画面統合
-- [ ] 全機能テスト・最適化
+Last updated: 2025-12-28

@@ -21,7 +21,7 @@ class Prompt:
         id: プロンプトの一意識別子（UUID）。
         title: プロンプトのタイトル。
         body: プロンプトの本文。
-        category_ids: カテゴリIDの階層 ["cat1_id", "cat2_id", "cat3_id"]。未分類は []。
+        category_ids: カテゴリIDの配列（タグ的利用、未分類は []）。
         favorite: お気に入り状態。
         deleted_at: 削除時刻（削除されていない場合は None）。
         created_at: 作成時刻。
@@ -29,7 +29,7 @@ class Prompt:
 
     Note:
         - id は自動生成（uuid4）。
-        - category_ids は最大 3 階層（config.MAX_CATEGORY_DEPTH 参照）。
+        - category_ids は階層ではなくフラットな配列として扱われます。
         - カテゴリ名変更時もプロンプトは影響を受けない（IDベース）。
         - deleted_at が None でない場合、プロンプトは論理削除状態。
     """
@@ -143,6 +143,6 @@ class Prompt:
                 updated_at=datetime.fromisoformat(data["updated_at"]),
             )
         except KeyError as e:
-            raise ValueError(f"必須フィールドが不足しています: {e}")
+            raise ValueError(f"必須フィールドが不足しています: {e}") from e
         except (TypeError, ValueError) as e:
-            raise TypeError(f"フィールドの型が不正です: {e}")
+            raise TypeError(f"フィールドの型が不正です: {e}") from e

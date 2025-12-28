@@ -184,20 +184,18 @@ print(formatted)
    - リスナーパターンによる通知機能
 2. `services/prompt_service.py` - プロンプトビジネスロジック
    - `create_prompt()` - Promptオブジェクト生成のみ
-   - `validate_category_depth()` - 階層制約の検証
    - 状態変更はStateManagerに委譲
-3. `services/category_service.py` - カテゴリビジネスロジック
-   - `create_category()` - Categoryオブジェクト生成
-   - `get_category_path()` - IDから階層パスを生成
-   - `validate_move()` - 移動時の階層検証
-4. `services/undo_service.py` - アンドゥ管理
-   - `push_state()`, `undo()` - Commandパターンで拡張可能
-5. `services/clipboard_service.py` - クリップボード操作
+3. `services/category_service.py` - カテゴリビジネスロジック（シンプル）
+   - `create_category()` - Categoryオブジェクト生成（parent_idなし）
+   - `update_category()` - 名前更新
+   - `delete_category()` - 削除
+4. `services/clipboard_service.py` - クリップボード操作
    - `copy_to_clipboard()`
-6. `services/search_service.py` - 検索・フィルタ
+5. `services/search_service.py` - 検索・フィルタ
    - `search_prompts()`, `filter_by_category()`
-   - `filter_by_category()`
    - `filter_by_favorite()`
+
+**Note**: アンドゥはCtrl+Zのキー操作で直前状態を戻す機能ではなく、削除はゴミ箱へ移動し、UIの「復元」操作で対応します。独立した `UndoService` の実装は必須ではありません。
 
 **成果物**:
 - StateManager（状態管理の中核）
@@ -243,19 +241,15 @@ from services.category_service import CategoryService
 cs = CategoryService()
 
 categories = [
-    Category(id="cat1", name="親", parent_id=None, order=0),
-    Category(id="cat2", name="子", parent_id="cat1", order=0),
-    Category(id="cat3", name="孫", parent_id="cat2", order=0),
+    Category(id="cat1", name="親", order=0),
+    Category(id="cat2", name="子", order=0),
+    Category(id="cat3", name="孫", order=0),
 ]
 
-path = cs.get_category_path(categories, "cat3")
-print(path)  # → ["親", "子", "孫"]
+# カテゴリはフラット（階層なし）
+print([c.name for c in categories])  # → ["親", "子", "孫"]
 
-# 4階層目の検証
-try:
-    cs.validate_depth(categories, "cat3", "cat4")
-except InvalidCategoryDepthError as e:
-    print(e.user_message)  # → "カテゴリは最大3階層までです"
+# 階層エラーの概念はないため検証不要
 
 # 4. SearchService
 from services.search_service import SearchService
@@ -368,12 +362,12 @@ print(results[0].title)  # → "Python入門"
 
 ## Phase 6: サイドバー - カテゴリ管理（重要）
 
-**目的**: カテゴリの表示・追加・編集・ドラッグ&ドロップ
+**目的**: カテゴリの表示・追加・編集（フラットな1階層）
 
 **実装内容**:
 1. `ui/components/sidebar/search_box.py` - 検索ボックス
-2. `ui/components/sidebar/category_item.py` - カテゴリアイテム（D&D対応）
-3. `ui/components/sidebar/category_tree.py` - カテゴリツリー表示
+2. `ui/components/sidebar/category_item.py` - カテゴリアイテム（シンプル表示）
+3. `ui/components/sidebar/category_list.py` - カテゴリ一覧表示（フラット）
 4. `ui/components/dialogs/add_category_dialog.py` - カテゴリ追加ダイアログ
 5. `ui/components/sidebar/add_category_button.py` - カテゴリ追加ボタン
 6. `ui/components/sidebar/sidebar.py` - サイドバー全体
@@ -381,19 +375,19 @@ print(results[0].title)  # → "Python入門"
 
 **成果物**:
 - サイドバーの完全実装
-- ドラッグ&ドロップによる階層変更（最大 3 階層）
+- ドラッグ&ドロップは実装しない（フラットなカテゴリ管理）
 - カテゴリ選択によるフィルタリング
 
 **依存**: Phase 2, Phase 4, Phase 5
-**難易度**: ⭐⭐⭐⭐
-**予想時間**: 3時間
+**難易度**: ⭐⭐
+**予想時間**: 1.5時間
 
 **実装順序**:
 1. ui/components/sidebar/search_box.py
 2. ui/components/dialogs/add_category_dialog.py
 3. ui/components/sidebar/add_category_button.py
 4. ui/components/sidebar/category_item.py
-5. ui/components/sidebar/category_tree.py
+5. ui/components/sidebar/category_list.py
 6. ui/components/sidebar/sidebar.py
 7. ui/controllers/category_controller.py
 
@@ -441,16 +435,16 @@ print(results[0].title)  # → "Python入門"
 
 ## Phase 9: キーボード操作（重要）
 
-**目的**: Ctrl+Z などのキーボードショートカット実装
+**目的**: キーボードショートカット実装（コピーなど）
 
 **実装内容**:
 1. `ui/controllers/keyboard_controller.py` - キーボード操作の一元管理
-   - Ctrl+Z：アンドゥ（削除の復元）
    - Ctrl+C：コピー（コンテキスト依存）
+   - Ctrl+F：検索フォーカス（任意）
    - その他ショートカット
 
 **成果物**:
-- キーボードショートカットの動作
+- キーボードショートカットの動作（Ctrl+ZによるUndoは実装対象外）
 
 **依存**: Phase 2, Phase 7
 **難易度**: ⭐⭐
@@ -497,26 +491,18 @@ print(results[0].title)  # → "Python入門"
 
 ## Phase 12: Undo機能拡張（オプション・低優先度）
 
-**目的**: Undo機能を削除以外にも拡張（Phase 2で基本実装済み）
+**目的**: Undo機能の拡張は今回のスコープ外（ゴミ箱復元で対応）
 
 **実装内容**:
-1. Commandパターンの導入検討
-2. 複数操作のUndo対応（編集、カテゴリ移動など）
-3. Redo機能の追加
-4. Undoスタックの永続化検討
-
-**成果物**:
-- 拡張されたUndo/Redo機能
+1. 現時点では追加のUndo/Redoは計画しない
+2. 将来的に要望が出た場合は Commandパターンで検討
 
 **Note**:
-- Phase 2で「削除のUndo」は既に実装済み
-- 本Phaseは追加の拡張であり、必須ではない
-- 代替案: ゴミ箱の復元機能を充実させて対応
-- Commandパターンを採用する場合は設計の大幅な変更が必要
+- 削除の復元はゴミ箱の「復元」操作で対応する
 
-**依存**: Phase 2（基本Undo）, Phase 7（統合）
-**難易度**: ⭐⭐⭐⭐
-**予想時間**: 3時間
+**依存**: なし
+**難易度**: ⭐
+**予想時間**: 0.5時間
 
 ---
 

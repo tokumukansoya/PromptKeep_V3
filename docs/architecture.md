@@ -19,7 +19,7 @@ PromptKeep_V3/
 ├── models/                          # データモデル
 │   ├── __init__.py
 │   ├── prompt.py                    # Promptモデル（id, title, body, category_ids, favorite, etc.）
-│   ├── category.py                  # Categoryモデル（id, name, parent_id）
+│   ├── category.py                  # Categoryモデル（id, name）  # フラットカテゴリ（parent_id 未使用）
 │   └── app_state.py                 # アプリ全体の状態管理
 │
 ├── services/                        # ビジネスロジック層
@@ -27,10 +27,10 @@ PromptKeep_V3/
 │   ├── state_manager.py             # **状態管理の中核**（新設）
 │   ├── data_service.py              # データ永続化サービス（JSON読み書き）
 │   ├── prompt_service.py            # プロンプトCRUD操作
-│   ├── category_service.py          # カテゴリCRUD操作
+│   ├── category_service.py          # カテゴリCRUD操作（シンプル・フラット）
 │   ├── search_service.py            # 検索・フィルタリングロジック
-│   ├── clipboard_service.py         # クリップボード操作
-│   └── undo_service.py              # アンドゥ・リドゥ管理
+│   └── clipboard_service.py         # クリップボード操作
+  # アンドゥはゴミ箱復元で代替（独立した UndoService の実装は必須ではありません）
 │
 ├── ui/                              # UI層
 │   ├── __init__.py
@@ -50,7 +50,7 @@ PromptKeep_V3/
 │   │   ├── sidebar/                 # サイドバー関連
 │   │   │   ├── __init__.py
 │   │   │   ├── sidebar.py           # サイドバー全体
-│   │   │   └── category_tree.py     # カテゴリツリー（検索込み）
+│   │   │   └── category_list.py     # カテゴリ一覧（フラット）
 │   │   │
 │   │   ├── card/                    # カード関連（簡素化）
 │   │   │   ├── __init__.py
@@ -252,8 +252,8 @@ class PromptService:
         return Prompt.create(title, body, category_ids)
     
     def validate_category_depth(self, category_ids: List[str]) -> bool:
-        # 階層制約の検証
-        return len(category_ids) <= MAX_CATEGORY_DEPTH
+        # フラットカテゴリのため階層制約は不要（常に True）
+        return True  # noqa: D401
 ```
 
 ### ui/controllers/main_controller.py
@@ -331,12 +331,12 @@ class BaseController:
 9. ui/controllers/main_controller.py - メインコントローラー
 
 ### Phase 3: カテゴリ（重要）
-10. services/category_service.py - カテゴリ管理
-11. ui/components/sidebar/category_tree.py - カテゴリツリー（ListTile + Column）
-12. ui/components/sidebar/category_item.py - ListTile + Draggable/DragTarget
+10. services/category_service.py - カテゴリ管理（フラット）
+11. ui/components/sidebar/category_list.py - カテゴリ一覧（ListTile）
+12. ui/components/sidebar/category_item.py - ListTile
 
 ### Phase 4: 追加機能（重要）
-13. services/undo_service.py - アンドゥ管理
+13. (Undo service removed - use trash restore)
 14. ui/views/trash_view.py - ゴミ箱
 15. services/clipboard_service.py - コピー機能
 16. ui/components/common/snackbar.py - 通知

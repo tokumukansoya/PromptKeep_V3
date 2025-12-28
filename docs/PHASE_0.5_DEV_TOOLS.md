@@ -1,51 +1,51 @@
-# Phase 0.5: 開発ツール導入（Ruff + Loguru）
+# Phase 0.5: Developer Tooling (Ruff + Loguru)
 
-このPhaseは、Phase 0とPhase 1の間に実施する追加セットアップです。
-
----
-
-## 目的
-- Ruff（Linter/Formatter）の導入
-- Loguru（ロギングライブラリ）の導入
-- 既存コードの品質向上
+This Phase is an optional setup step between Phase 0 and Phase 1 to improve developer productivity and code quality.
 
 ---
 
-## 実装内容
+## Goals
 
-### 1. Ruffのインストールと設定
+- Add Ruff (linter/formatter)
+- Add Loguru for consistent logging
+- Improve existing code quality and integrate tools into editor and CI
+
+---
+
+## Implementation
+
+### 1. Install Ruff
 
 ```bash
-# 開発用パッケージとして追加
+# Add as a dev dependency
 uv add --dev ruff
-
-# VS Code拡張のインストール推奨
-# charliermarsh.ruff
 ```
 
-### 2. Loguruのインストール
+Recommend installing the VS Code extension: charliermarsh.ruff.
+
+### 2. Install Loguru
 
 ```bash
-# プロジェクト依存として追加
 uv add loguru
 ```
 
-### 3. utils/logger.py の作成
+### 3. Create `utils/logger.py`
+
+Provide a central logging configuration using Loguru.
 
 ```python
-"""ロギング設定（Loguru使用）
+"""Logging setup (Loguru)
 
-Loguruを使った統一的なロギング設定を提供する。
+Provides consistent logging configuration for the project.
 """
 
 import sys
 from pathlib import Path
 from loguru import logger
 
-# デフォルト設定を削除
 logger.remove()
 
-# コンソール出力（開発時）
+# Console logger (development)
 logger.add(
     sys.stderr,
     format="<green>{time:YYYY-MM-DD HH:mm:ss}</green> | <level>{level: <8}</level> | <cyan>{name}</cyan>:<cyan>{function}</cyan>:<cyan>{line}</cyan> - <level>{message}</level>",
@@ -53,23 +53,23 @@ logger.add(
     colorize=True,
 )
 
-# ファイル出力
+# File logger
 log_dir = Path("logs")
 log_dir.mkdir(exist_ok=True)
 
 logger.add(
     "logs/promptkeep_{time:YYYY-MM-DD}.log",
-    rotation="00:00",  # 日次ローテーション
-    retention="7 days",  # 7日間保持
+    rotation="00:00",
+    retention="7 days",
     level="INFO",
     format="{time:YYYY-MM-DD HH:mm:ss} | {level: <8} | {name}:{function}:{line} - {message}",
 )
 
-# エラーログ専用
+# Error logger
 logger.add(
     "logs/error_{time:YYYY-MM-DD}.log",
     rotation="00:00",
-    retention="30 days",  # 30日間保持
+    retention="30 days",
     level="ERROR",
     format="{time:YYYY-MM-DD HH:mm:ss} | {level: <8} | {name}:{function}:{line} - {message}\n{exception}",
 )
@@ -77,30 +77,28 @@ logger.add(
 __all__ = ["logger"]
 ```
 
-### 4. 既存コードの更新
+### 4. Migrate from standard logging to Loguru (optional)
 
-#### 標準loggingからLoguruへの移行
+Before:
 
-**Before:**
 ```python
 import logging
-
 logger = logging.getLogger(__name__)
-logger.info("メッセージ")
+logger.info("message")
 ```
 
-**After:**
+After:
+
 ```python
 from loguru import logger
-
-logger.info("メッセージ")
+logger.info("message")
 ```
 
 ---
 
-## 実装手順
+## Steps
 
-### Step 1: Git ブランチ作成
+1. Create a branch:
 
 ```bash
 git checkout main
@@ -108,168 +106,51 @@ git pull origin main
 git checkout -b phase-0.5-dev-tools
 ```
 
-### Step 2: パッケージインストール
+2. Install packages:
 
 ```bash
-# Ruff（開発用）
 uv add --dev ruff
-
-# Loguru
 uv add loguru
 ```
 
-### Step 3: utils/logger.py 作成
-
-上記のコードを `utils/logger.py` に作成。
+3. Add `utils/logger.py` and commit:
 
 ```bash
 git add utils/logger.py pyproject.toml
-git commit -m "feat: Phase 0.5 Loguru導入とlogger設定"
+git commit -m "feat: Phase 0.5 Add Loguru logger and Ruff config"
 ```
 
-### Step 4: Ruff設定確認
+4. Configure VS Code settings for Ruff (create `.vscode/settings.json`) and commit.
 
-`pyproject.toml` にRuff設定が追加されていることを確認。
+5. Optionally run formatting and linting:
 
 ```bash
-git add pyproject.toml
-git commit -m "chore: Phase 0.5 Ruff設定追加"
-```
-
-### Step 5: VS Code拡張インストール
-
-VS Codeで以下の拡張をインストール：
-- Ruff (charliermarsh.ruff)
-
-`.vscode/settings.json` を作成：
-
-```json
-{
-  "[python]": {
-    "editor.defaultFormatter": "charliermarsh.ruff",
-    "editor.formatOnSave": true,
-    "editor.codeActionsOnSave": {
-      "source.fixAll.ruff": "explicit",
-      "source.organizeImports.ruff": "explicit"
-    }
-  },
-  "ruff.lint.args": ["--config=pyproject.toml"],
-  "ruff.format.args": ["--config=pyproject.toml"]
-}
-```
-
-```bash
-git add .vscode/settings.json
-git commit -m "chore: Phase 0.5 VS Code設定追加"
-```
-
-### Step 6: 既存コードのフォーマット（任意）
-
-```bash
-# 全ファイルをフォーマット
 uv run ruff format .
-
-# Lintエラーを自動修正
-uv run ruff check --fix .
-
-git add .
-git commit -m "style: Phase 0.5 Ruffでコードフォーマット"
-```
-
-### Step 7: 完了
-
-```bash
-git checkout main
-git merge phase-0.5-dev-tools
-git push origin main
-git branch -d phase-0.5-dev-tools
-```
-
----
-
-## 検証可能な成功基準
-
-### Ruff
-
-```bash
-# Lint チェック成功
 uv run ruff check .
-# → エラーなし、または軽微な警告のみ
-
-# フォーマットチェック成功
-uv run ruff format --check .
-# → "All files left unchanged" と表示
 ```
 
-### Loguru
+6. Merge back to main when ready.
+
+---
+
+## Validation
+
+- Ruff check reports no blocking issues
+- Logger import works:
 
 ```bash
-# logger.py のインポート成功
-uv run python -c "from utils.logger import logger; logger.info('Test')"
-# → カラフルなログが出力される
-# → logs/promptkeep_YYYY-MM-DD.log が作成される
+uv run python -c "from utils.logger import logger; logger.info('test')"
 ```
 
-### VS Code統合
-
-- ファイル保存時に自動フォーマットされる
-- Lintエラーが波線で表示される
-- インポートが自動整理される
+- Log files are created under `logs/`
 
 ---
 
-## ドキュメント更新
+## Notes
 
-このPhaseは既存機能の改善なので、以下のドキュメントを更新：
-
-1. ✅ `pyproject.toml` - Ruff/Loguru追加済み
-2. ✅ `.clinerules` - Ruff/Loguru情報追加済み
-3. ✅ `docs/TOOL_EVALUATION.md` - 評価レポート作成済み
-4. ✅ `docs/QUICKSTART.md` - コマンド更新推奨
+- This Phase mainly improves developer experience and does not change runtime behavior of the app.
+- Update `pyproject.toml` and `.clinerules` as needed.
 
 ---
 
-## 今後の使い方
-
-### 日常的な使用
-
-```bash
-# コード書く → 保存（自動フォーマット）
-
-# コミット前にチェック
-uv run ruff check .
-uv run ruff format --check .
-
-# エラーがあれば自動修正
-uv run ruff check --fix .
-uv run ruff format .
-```
-
-### ログ確認
-
-```bash
-# 最新のログ確認
-tail -f logs/promptkeep_$(date +%Y-%m-%d).log
-
-# エラーログ確認
-tail -f logs/error_$(date +%Y-%m-%d).log
-```
-
----
-
-## 依存関係
-
-- **Phase 0**: 完了している必要がある
-- **Phase 1以降**: このPhase完了後に実施
-
----
-
-## 所要時間
-
-- 実装: 15分
-- 検証: 5分
-- 合計: **20分**
-
----
-
-**次のステップ**: [Phase 1: データ層の実装](implementation_plan.md#phase-1-データ層の実装必須)
+**Last updated**: 2025-12-28

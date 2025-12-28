@@ -38,15 +38,15 @@ class CategoryNotFoundError(PromptKeeperError):
 
 
 class InvalidCategoryDepthError(PromptKeeperError):
-    """カテゴリの階層が深すぎる場合の例外。
+    """（非推奨）カテゴリの階層が深すぎる場合の例外。
 
-    config.MAX_CATEGORY_DEPTH を超える場合に発生。
+    現仕様ではカテゴリはフラット（1階層）のため、この例外は通常発生しません。
     """
 
-    def __init__(self, current_depth: int, max_depth: int = 3):
+    def __init__(self, current_depth: int, max_depth: int = 1):
         super().__init__(
             f"Category depth {current_depth} exceeds maximum {max_depth}",
-            user_message=f"カテゴリは最大{max_depth}階層までです",
+            user_message=f"カテゴリはフラット（階層なし）です",
         )
         self.current_depth = current_depth
         self.max_depth = max_depth

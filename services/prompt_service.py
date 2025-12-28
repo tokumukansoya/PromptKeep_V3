@@ -9,11 +9,7 @@ from typing import List, Optional
 
 from loguru import logger
 
-from config import MAX_CATEGORY_DEPTH
-from exceptions import (
-    InvalidCategoryDepthError,
-    PromptNotFoundError,
-)
+from exceptions import PromptNotFoundError
 from models.app_state import AppState
 from models.prompt import Prompt
 from services.data_service import DataService
@@ -48,14 +44,10 @@ class PromptService:
         Args:
             title: プロンプトのタイトル。
             body: プロンプトの本文。
-            category_ids: カテゴリIDの階層。
+            category_ids: カテゴリIDの配列（タグ的に複数指定可能）。
 
         Returns:
             新規作成された Prompt オブジェクト。
-
-        Raises:
-            InvalidCategoryDepthError: カテゴリ階層が深すぎる場合。
-            ValidationError: バリデーション失敗時。
 
         Example:
             >>> service = PromptService(data_service)
@@ -63,14 +55,6 @@ class PromptService:
         """
         if category_ids is None:
             category_ids = []
-
-        if len(category_ids) > MAX_CATEGORY_DEPTH:
-            logger.error(
-                f"Category depth exceeds limit: {len(category_ids)} > {MAX_CATEGORY_DEPTH}"
-            )
-            raise InvalidCategoryDepthError(
-                f"カテゴリ階層が深すぎます（最大 {MAX_CATEGORY_DEPTH}）"
-            )
 
         prompt = Prompt.create(title, body, category_ids)
         logger.info(f"Created prompt: {prompt.id}")
@@ -117,7 +101,7 @@ class PromptService:
             prompt_id: 更新対象のプロンプト ID。
             title: 新しいタイトル（未指定時は変更しない）。
             body: 新しい本文（未指定時は変更しない）。
-            category_ids: 新しいカテゴリID階層（未指定時は変更しない）。
+            category_ids: 新しいカテゴリID配列（タグ的に複数指定可能）。
             favorite: 新しいお気に入り状態（未指定時は変更しない）。
 
         Returns:
@@ -125,7 +109,6 @@ class PromptService:
 
         Raises:
             PromptNotFoundError: プロンプトが見つからない場合。
-            InvalidCategoryDepthError: カテゴリ階層が深すぎる場合。
 
         Example:
             >>> updated = service.update_prompt(
@@ -139,10 +122,6 @@ class PromptService:
         if body is not None:
             prompt.body = body
         if category_ids is not None:
-            if len(category_ids) > MAX_CATEGORY_DEPTH:
-                raise InvalidCategoryDepthError(
-                    f"カテゴリ階層が深すぎます（最大 {MAX_CATEGORY_DEPTH}）"
-                )
             prompt.category_ids = category_ids
         if favorite is not None:
             prompt.favorite = favorite

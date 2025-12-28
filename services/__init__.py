@@ -7,7 +7,6 @@ __all__ = [
     "DataService",
     "PromptService",
     "CategoryService",
-    "UndoService",
     "ClipboardService",
     "SearchService",
 ]

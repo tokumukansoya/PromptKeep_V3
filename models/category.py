@@ -6,40 +6,34 @@ Flet 0.28.3、Python 3.14.2 対応。
 
 import uuid
 from dataclasses import dataclass
-from typing import Optional
 
 
 @dataclass
 class Category:
     """カテゴリデータモデル。
 
-    カテゴリの単位となるデータクラス。
-    階層構造（親子関係）をサポート。
+    カテゴリはフラットな一覧で管理されます（親子関係はサポートしません）。
 
     Attributes:
         id: カテゴリの一意識別子（UUID）。
         name: カテゴリ名。
-        parent_id: 親カテゴリの ID（ルートの場合は None）。
-        order: 同じ親内での表示順序。
+        order: 表示順序（必要に応じて使用）。
 
     Note:
         - id は自動生成（uuid4）。
-        - 最大階層深さは config.MAX_CATEGORY_DEPTH で定義。
-        - order は D&D で並べ替え時に更新。
+        - 階層はサポートしない（parent_id は廃止）。
     """
 
     id: str
     name: str
-    parent_id: Optional[str]
     order: int
 
     @staticmethod
-    def create(name: str, parent_id: Optional[str] = None, order: int = 0) -> "Category":
+    def create(name: str, order: int = 0) -> "Category":
         """新規カテゴリを作成する。
 
         Args:
             name: カテゴリ名。
-            parent_id: 親カテゴリの ID（ルートの場合は None）。
             order: 表示順序。
 
         Returns:
@@ -50,26 +44,13 @@ class Category:
             >>> print(category.name)
             AI
         """
-        return Category(id=str(uuid.uuid4()), name=name, parent_id=parent_id, order=order)
+        return Category(id=str(uuid.uuid4()), name=name, order=order)
 
     def to_dict(self) -> dict:
-        """Category オブジェクトを辞書に変換。
-
-        JSON 保存用の辞書形式に変換。
-
-        Returns:
-            辞書形式の Category データ。
-
-        Example:
-            >>> category = Category.create("AI")
-            >>> d = category.to_dict()
-            >>> print(d["name"])
-            AI
-        """
+        """Category オブジェクトを辞書に変換（JSON 保存用）。"""
         return {
             "id": self.id,
             "name": self.name,
-            "parent_id": self.parent_id,
             "order": self.order,
         }
 
@@ -77,35 +58,15 @@ class Category:
     def from_dict(data: dict) -> "Category":
         """辞書から Category オブジェクトを構築。
 
-        JSON から読み込んだ辞書を Category に変換。
-
-        Args:
-            data: Category データの辞書。
-
-        Returns:
-            構築された Category オブジェクト。
-
-        Raises:
-            ValueError: 必須フィールドが不足している場合。
-            TypeError: フィールドの型が不正な場合。
-
-        Example:
-            >>> data = {
-            ...     "id": "uuid",
-            ...     "name": "AI",
-            ...     "parent_id": None,
-            ...     "order": 0
-            ... }
-            >>> category = Category.from_dict(data)
+        互換性のため、旧データに `parent_id` が含まれていても無視します。
         """
         try:
             return Category(
                 id=data["id"],
                 name=data["name"],
-                parent_id=data.get("parent_id"),
                 order=data.get("order", 0),
             )
         except KeyError as e:
-            raise ValueError(f"必須フィールドが不足しています: {e}")
+            raise ValueError(f"必須フィールドが不足しています: {e}") from e
         except (TypeError, ValueError) as e:
-            raise TypeError(f"フィールドの型が不正です: {e}")
+            raise TypeError(f"フィールドの型が不正です: {e}") from e
