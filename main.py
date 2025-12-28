@@ -27,11 +27,11 @@ def check_versions() -> None:
     """
     # Python バージョン確認
     python_version = f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}"
-    logger.info(f"Python version: {python_version} (required: {MIN_PYTHON_VERSION}+)")
+    logger.info(f"Python version: {python_version} (required: {MIN_PYTHON_VERSION}+")
 
-    if sys.version_info < (3, 14):
-        logger.error(f"Python 3.14+ required, got {python_version}")
-        raise SystemExit(f"Python 3.14以上が必要です（現在: {python_version}）")
+    if sys.version_info < (3, 12, 3):
+        logger.error(f"Python 3.12.3+ required, got {python_version}")
+        raise SystemExit(f"Python 3.12.3以上が必要です（現在: {python_version}）")
 
     # Flet バージョン確認
     try:
@@ -45,7 +45,6 @@ def check_versions() -> None:
         logger.warning(
             f"Flet version mismatch: expected {REQUIRED_FLET_VERSION}, got {flet_version}"
         )
-
 
 def main() -> None:
     """メインアプリケーション。
@@ -62,10 +61,9 @@ def main() -> None:
     # ここから UI 層のインポートと初期化
     logger.info("Initializing application...")
 
-    # TODO: UI 層の実装が完成したら以下をアンコメント
-    # from ui.app import PromptKeepApp
-    # app = PromptKeepApp()
-    # app.run()
+    from ui.app import PromptKeepApp
+    app = PromptKeepApp()
+    app.run()
 
     logger.info("PromptKeep Application initialized")
     logger.info("UI implementation pending...")

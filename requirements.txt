@@ -1,2 +1,5 @@
+# 必須パッケージ
 flet==0.28.3
-python-dotenv==1.0.0
+
+# Python 3.12.3 互換性のための依存関係
+importlib-metadata>=6.0.0; python_version < '3.12'

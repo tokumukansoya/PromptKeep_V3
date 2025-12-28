@@ -1,202 +1,150 @@
-"""StateManager - アプリケーション状態管理の中核クラス。
-
-状態の一元管理、自動保存、変更通知を担当。
-Flet 0.28.3、Python 3.14.2 対応。
-"""
+"""状態管理サービス。"""
 
 import asyncio
-from typing import TYPE_CHECKING, Callable, List, Optional
-
-from loguru import logger
+from typing import Callable, List, Optional
 
 from models.app_state import AppState
-from models.category import Category
 from models.prompt import Prompt
+from models.category import Category
 from services.data_service import DataService
-
-if TYPE_CHECKING:
-    import flet as ft
+from config import DEBOUNCE_SECONDS
+from utils.logger import logger
 
 
 class StateManager:
-    """アプリケーション状態を管理する中核クラス。
+    """アプリケーション状態を管理するクラス。
 
-    責務:
-        - AppStateの一元管理
-        - 状態変更時の自動保存（デバウンス付き）
-        - UI更新通知の配信
-        - データ永続化の統括
-
-    Attributes:
-        _page: Fletのpageオブジェクト（非同期タスク実行用）
-        _state: 現在のアプリケーション状態
-        _data_service: データ永続化サービス
-        _listeners: 状態変更リスナーのリスト
-        _save_task: 自動保存のタスク
-
-    Note:
-        - 全てのControllerはこのクラスを経由して状態を変更する
-        - 状態を直接変更せず、必ずメソッドを呼ぶこと
-        - 自動保存は2秒のデバウンス付き
-        - 非同期処理はpage.run_task()を使用（asyncio.create_task()は使用しない）
+    全ての状態変更はこのクラスを経由する。
+    デバウンス付き自動保存機能を提供。
     """
 
-    def __init__(
-        self,
-        page: "ft.Page",
-        data_service: DataService,
-        debounce_seconds: float = 2.0,
-    ):
-        """StateManagerを初期化。
-
-        Args:
-            page: Fletのpageオブジェクト（非同期タスク実行用）
-            data_service: データ永続化サービス
-            debounce_seconds: 自動保存のデバウンス時間（秒）
-        """
-        self._page = page
-        self._state = AppState.empty()
-        self._data_service = data_service
+    def __init__(self, data_service: DataService, debounce_seconds: float = DEBOUNCE_SECONDS):
+        self.data_service = data_service
+        self.debounce_seconds = debounce_seconds
+        self._state: AppState = AppState.empty()
         self._listeners: List[Callable[[AppState], None]] = []
         self._save_task: Optional[asyncio.Task] = None
-        self._debounce_seconds = debounce_seconds
-        logger.info("StateManager initialized")
 
     @property
     def state(self) -> AppState:
-        """現在の状態を取得（読み取り専用）。
-
-        Returns:
-            現在のAppState
-        """
+        """現在の状態を取得する。"""
         return self._state
 
-    def load(self) -> None:
-        """データをファイルから読み込む。
-
-        Raises:
-            DataPersistenceError: 読み込み失敗時
-        """
-        try:
-            self._state = self._data_service.load()
-            logger.info(
-                f"State loaded: {len(self._state.prompts)} prompts, {len(self._state.categories)} categories"
-            )
-            self._notify_listeners()
-        except Exception as e:
-            logger.error(f"Failed to load state: {e}")
-            raise
-
     def add_listener(self, listener: Callable[[AppState], None]) -> None:
-        """状態変更リスナーを登録。
-
-        Args:
-            listener: 状態変更時に呼ばれるコールバック
-        """
+        """状態変更時のリスナーを追加する。"""
         self._listeners.append(listener)
 
     def remove_listener(self, listener: Callable[[AppState], None]) -> None:
-        """状態変更リスナーを解除。
-
-        Args:
-            listener: 解除するコールバック
-        """
+        """リスナーを削除する。"""
         if listener in self._listeners:
             self._listeners.remove(listener)
 
-    def update_prompts(self, prompts: List[Prompt]) -> None:
-        """プロンプトリストを更新。
-
-        Args:
-            prompts: 新しいプロンプトリスト
-        """
-        self._state.prompts = prompts
-        self._notify_listeners()
-        self._schedule_save()
-
-    def update_categories(self, categories: List[Category]) -> None:
-        """カテゴリリストを更新。
-
-        Args:
-            categories: 新しいカテゴリリスト
-        """
-        self._state.categories = categories
-        self._notify_listeners()
-        self._schedule_save()
-
-    def set_selected_category(self, category_id: str | None) -> None:
-        """選択中のカテゴリを設定。
-
-        Args:
-            category_id: カテゴリID（None = 全表示）
-        """
-        self._state.selected_category_id = category_id
-        self._notify_listeners()
-
-    def set_search_query(self, query: str) -> None:
-        """検索クエリを設定。
-
-        Args:
-            query: 検索文字列
-        """
-        self._state.search_query = query
-        self._notify_listeners()
-
-    def set_editing_prompt(self, prompt_id: str | None) -> None:
-        """編集中のプロンプトを設定。
-
-        Args:
-            prompt_id: プロンプトID（None = 編集なし）
-        """
-        self._state.current_editing_id = prompt_id
-        self._notify_listeners()
-
-    def _notify_listeners(self) -> None:
-        """全てのリスナーに状態変更を通知。"""
+    def notify_listeners(self) -> None:
+        """全てのリスナーに状態変更を通知する。"""
         for listener in self._listeners:
             try:
                 listener(self._state)
             except Exception as e:
                 logger.error(f"Listener error: {e}")
 
-    def _schedule_save(self) -> None:
-        """自動保存をスケジュール（デバウンス付き）。
+    def load(self) -> AppState:
+        """データを読み込む。"""
+        self._state = self.data_service.load()
+        logger.info(f"State loaded: {len(self._state.prompts)} prompts, {len(self._state.categories)} categories")
+        return self._state
 
-        Flet推奨: page.run_task()を使用（asyncio.create_task()は使用しない）
-        """
-        if self._save_task:
-            self._save_task.cancel()
-
-        # Flet推奨パターン: page.run_task()でバックグラウンドタスク実行
-        self._save_task = self._page.run_task(self._debounced_save)
+    def save(self) -> None:
+        """データを保存する。"""
+        self.data_service.save(self._state)
+        logger.info("State saved")
 
     async def _debounced_save(self) -> None:
-        """デバウンス付き自動保存。"""
-        try:
-            await asyncio.sleep(self._debounce_seconds)
-            self._save()
-        except asyncio.CancelledError:
-            # キャンセルされた場合は何もしない
-            pass
+        """デバウンス付きで保存する。"""
+        await asyncio.sleep(self.debounce_seconds)
+        self.save()
 
-    def _save(self) -> None:
-        """状態をファイルに保存。
-
-        Raises:
-            DataPersistenceError: 保存失敗時
-        """
-        try:
-            self._data_service.save(self._state)
-            logger.info("State saved successfully")
-        except Exception as e:
-            logger.error(f"Failed to save state: {e}")
-            raise
-
-    def force_save(self) -> None:
-        """即座に保存（デバウンスなし）。
-
-        アプリ終了時などに使用。
-        """
-        if self._save_task:
+    def schedule_save(self) -> None:
+        """デバウンス付き保存をスケジュールする。"""
+        if self._save_task and not self._save_task.done():
             self._save_task.cancel()
-        self._save()
+        try:
+            loop = asyncio.get_running_loop()
+            self._save_task = loop.create_task(self._debounced_save())
+        except RuntimeError:
+            # イベントループがない場合は同期的に保存
+            try:
+                self.save()
+            except Exception as e:
+                logger.error(f"Failed to save synchronously: {e}")
+
+    def update_state(self, **kwargs) -> None:
+        """状態を更新し、リスナーに通知して保存をスケジュールする。"""
+        for key, value in kwargs.items():
+            if hasattr(self._state, key):
+                setattr(self._state, key, value)
+        self.notify_listeners()
+        self.schedule_save()
+
+    # プロンプト操作
+    def add_prompt(self, prompt: Prompt) -> None:
+        """プロンプトを追加する。"""
+        self._state.prompts.append(prompt)
+        self.notify_listeners()
+        self.schedule_save()
+
+    def update_prompt(self, prompt: Prompt) -> None:
+        """プロンプトを更新する。"""
+        for i, p in enumerate(self._state.prompts):
+            if p.id == prompt.id:
+                self._state.prompts[i] = prompt
+                break
+        self.notify_listeners()
+        self.schedule_save()
+
+    def remove_prompt(self, prompt_id: str) -> None:
+        """プロンプトを完全に削除する。"""
+        self._state.prompts = [p for p in self._state.prompts if p.id != prompt_id]
+        self.notify_listeners()
+        self.schedule_save()
+
+    # カテゴリ操作
+    def add_category(self, category: Category) -> None:
+        """カテゴリを追加する。"""
+        self._state.categories.append(category)
+        self.notify_listeners()
+        self.schedule_save()
+
+    def update_category(self, category: Category) -> None:
+        """カテゴリを更新する。"""
+        for i, c in enumerate(self._state.categories):
+            if c.id == category.id:
+                self._state.categories[i] = category
+                break
+        self.notify_listeners()
+        self.schedule_save()
+
+    def remove_category(self, category_id: str) -> None:
+        """カテゴリを削除する。"""
+        self._state.categories = [c for c in self._state.categories if c.id != category_id]
+        # プロンプトからもカテゴリIDを削除
+        for prompt in self._state.prompts:
+            if category_id in prompt.category_ids:
+                prompt.category_ids.remove(category_id)
+        self.notify_listeners()
+        self.schedule_save()
+
+    # 選択状態
+    def select_category(self, category_id: Optional[str]) -> None:
+        """カテゴリを選択する。"""
+        self._state.selected_category_id = category_id
+        self.notify_listeners()
+
+    def set_search_query(self, query: str) -> None:
+        """検索クエリを設定する。"""
+        self._state.search_query = query
+        self.notify_listeners()
+
+    def set_editing_prompt(self, prompt_id: Optional[str]) -> None:
+        """編集中のプロンプトを設定する。"""
+        self._state.current_editing_id = prompt_id
+        self.notify_listeners()

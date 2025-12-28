@@ -1,152 +1,98 @@
-"""AppState - アプリケーション状態管理。
-
-アプリケーション全体の状態を一元管理するクラス。
-Flet 0.28.3、Python 3.14.2 対応。
-"""
+"""アプリケーション状態モデル。"""
 
 from dataclasses import dataclass, field
 from typing import List, Optional
 
-from models.category import Category
 from models.prompt import Prompt
+from models.category import Category
 
 
 @dataclass
 class AppState:
-    """アプリケーション全体の状態。
-
-    プロンプト、カテゴリ、ゴミ箱、UI 状態をまとめて管理。
-
-    Attributes:
-        prompts: すべてのプロンプト（削除済みを含む）。
-        categories: すべてのカテゴリ。
-        trash: 削除済みプロンプト ID のリスト。
-        selected_category_id: 選択中のカテゴリ ID（None = 全表示）。
-        search_query: 検索クエリ。
-        current_editing_id: 編集中のプロンプト ID（None = 編集なし）。
-
-    Note:
-        - 状態更新はStateManagerを経由して行う（直接変更禁止）。
-        - StateManagerがデバウンス付き自動保存を管理。
-        - 各Controllerは状態を直接変更せず、StateManagerのメソッドを呼ぶ。
-    """
+    """アプリケーション全体の状態を保持するデータクラス。"""
 
     prompts: List[Prompt] = field(default_factory=list)
     categories: List[Category] = field(default_factory=list)
-    trash: List[str] = field(default_factory=list)  # prompt IDs
+    trash_prompt_ids: List[str] = field(default_factory=list)
+    trash_category_ids: List[str] = field(default_factory=list)
     selected_category_id: Optional[str] = None
     search_query: str = ""
     current_editing_id: Optional[str] = None
 
-    @staticmethod
-    def empty() -> "AppState":
-        """空の AppState を作成。
-
-        Returns:
-            初期化された AppState オブジェクト。
-
-        Example:
-            >>> state = AppState.empty()
-            >>> print(len(state.prompts))
-            0
-        """
-        return AppState()
+    @classmethod
+    def empty(cls) -> "AppState":
+        """空の AppState を作成する。"""
+        return cls()
 
     def to_dict(self) -> dict:
-        """AppState を辞書に変換。
-
-        JSON 保存用の形式に変換。
-
-        Returns:
-            辞書形式の AppState データ。
-        """
+        """辞書に変換する（永続化用）。"""
         return {
             "prompts": [p.to_dict() for p in self.prompts],
             "categories": [c.to_dict() for c in self.categories],
-            "trash": self.trash,
-            "metadata": {
-                "selected_category_id": self.selected_category_id,
-                "search_query": self.search_query,
-                "current_editing_id": self.current_editing_id,
+            "trash": {
+                "prompts": self.trash_prompt_ids,
+                "categories": self.trash_category_ids,
             },
         }
 
-    @staticmethod
-    def from_dict(data: dict) -> "AppState":
-        """辞書から AppState を構築。
-
-        JSON から読み込んだ辞書を AppState に変換。
-
+    @classmethod
+    def from_dict(cls, data: dict) -> "AppState":
+        """辞書から AppState を作成する。
+        
         Args:
-            data: AppState データの辞書。
-
+            data: 状態データの辞書
+            
         Returns:
-            構築された AppState オブジェクト。
-
-        Raises:
-            ValueError: データ形式が不正な場合。
-            TypeError: フィールド型が不正な場合。
-
-        Example:
-            >>> data = {
-            ...     "prompts": [],
-            ...     "categories": [],
-            ...     "trash": [],
-            ...     "metadata": {}
-            ... }
-            >>> state = AppState.from_dict(data)
+            AppState インスタンス
         """
         try:
             prompts = [Prompt.from_dict(p) for p in data.get("prompts", [])]
+        except Exception:
+            prompts = []
+        
+        try:
             categories = [Category.from_dict(c) for c in data.get("categories", [])]
-            trash = data.get("trash", [])
-            metadata = data.get("metadata", {})
-
-            return AppState(
-                prompts=prompts,
-                categories=categories,
-                trash=trash,
-                selected_category_id=metadata.get("selected_category_id"),
-                search_query=metadata.get("search_query", ""),
-                current_editing_id=metadata.get("current_editing_id"),
-            )
-        except (KeyError, ValueError, TypeError) as e:
-            raise ValueError(f"AppState の構築に失敗しました: {e}") from e
-
-    def get_prompt(self, prompt_id: str) -> Optional[Prompt]:
-        """ID でプロンプトを取得。
-
-        Args:
-            prompt_id: プロンプト ID。
-
-        Returns:
-            プロンプトオブジェクト、見つからない場合は None。
-        """
-        return next((p for p in self.prompts if p.id == prompt_id), None)
-
-    def get_category(self, category_id: str) -> Optional[Category]:
-        """ID でカテゴリを取得。
-
-        Args:
-            category_id: カテゴリ ID。
-
-        Returns:
-            カテゴリオブジェクト、見つからない場合は None。
-        """
-        return next((c for c in self.categories if c.id == category_id), None)
+        except Exception:
+            categories = []
+        
+        trash = data.get("trash", {})
+        return cls(
+            prompts=prompts,
+            categories=categories,
+            trash_prompt_ids=trash.get("prompts", []) if isinstance(trash, dict) else [],
+            trash_category_ids=trash.get("categories", []) if isinstance(trash, dict) else [],
+        )
 
     def get_active_prompts(self) -> List[Prompt]:
-        """削除されていないプロンプトを取得。
-
-        Returns:
-            アクティブなプロンプトリスト。
-        """
+        """削除されていないプロンプトを取得する。"""
         return [p for p in self.prompts if p.deleted_at is None]
 
-    def get_deleted_prompts(self) -> List[Prompt]:
-        """削除されたプロンプトを取得（ゴミ箱用）。
-
-        Returns:
-            削除済みプロンプトリスト。
-        """
+    def get_trashed_prompts(self) -> List[Prompt]:
+        """ゴミ箱にあるプロンプトを取得する。"""
         return [p for p in self.prompts if p.deleted_at is not None]
+
+    def get_favorite_prompts(self) -> List[Prompt]:
+        """お気に入りのプロンプトを取得する。"""
+        return [p for p in self.get_active_prompts() if p.favorite]
+
+    def get_prompts_by_category(self, category_id: str) -> List[Prompt]:
+        """特定のカテゴリに属するプロンプトを取得する。"""
+        return [p for p in self.get_active_prompts() if category_id in p.category_ids]
+
+    def get_uncategorized_prompts(self) -> List[Prompt]:
+        """カテゴリなしのプロンプトを取得する。"""
+        return [p for p in self.get_active_prompts() if not p.category_ids]
+
+    def get_category_by_id(self, category_id: str) -> Optional[Category]:
+        """IDでカテゴリを取得する。"""
+        for c in self.categories:
+            if c.id == category_id:
+                return c
+        return None
+
+    def get_prompt_by_id(self, prompt_id: str) -> Optional[Prompt]:
+        """IDでプロンプトを取得する。"""
+        for p in self.prompts:
+            if p.id == prompt_id:
+                return p
+        return None

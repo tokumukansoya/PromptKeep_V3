@@ -58,13 +58,11 @@ class DataPersistenceError(PromptKeeperError):
     JSON の読み込み・書き込み失敗時に発生。
     """
 
-    def __init__(self, operation: str, reason: str):
+    def __init__(self, message: str, user_message: str | None = None):
         super().__init__(
-            f"Data persistence failed during {operation}: {reason}",
-            user_message="データの保存に失敗しました。変更が失われる可能性があります。",
+            message,
+            user_message=user_message or "データの保存に失敗しました。変更が失われる可能性があります。",
         )
-        self.operation = operation
-        self.reason = reason
 
 
 class InvalidDataError(PromptKeeperError):

@@ -4,15 +4,15 @@ Flet 0.28.3、Python 3.14.2 対応。
 プロンプトカードの視覚的定義を一元管理。
 """
 
-from config import CARD_SIZE
+from config import MAX_CATEGORY_DEPTH
 from ui.styles.colors import BORDER_COLOR, DARK_BG_SECONDARY, TEXT_PRIMARY
 from ui.styles.spacing import BORDER_RADIUS_MD, PADDING_MD
 
 # ============================================================================
 # カード全体
 # ============================================================================
-CARD_WIDTH = CARD_SIZE  # 正方形カード
-CARD_HEIGHT = CARD_SIZE  # 正方形カード
+CARD_WIDTH = 200  # 正方形カード
+CARD_HEIGHT = 200  # 正方形カード
 CARD_BG_COLOR = DARK_BG_SECONDARY
 CARD_BORDER_COLOR = BORDER_COLOR
 CARD_BORDER_WIDTH = 1

@@ -13,11 +13,18 @@ from pathlib import Path
 
 from loguru import logger
 
-from config import LOG_LEVEL
+# ログディレクトリの作成（PyInstaller対応）
+from utils.path_utils import get_log_dir
 
-# ログディレクトリの作成
-LOG_DIR = Path("logs")
-LOG_DIR.mkdir(exist_ok=True)
+LOG_DIR = get_log_dir()
+try:
+    LOG_DIR.mkdir(exist_ok=True, parents=True)
+except OSError:
+    # ディレクトリ作成に失敗した場合はカレントディレクトリを使用
+    LOG_DIR = Path(".")
+
+# config.pyはloggerをインポートするため、循環インポートを避けてデフォルト値を使用
+LOG_LEVEL = "INFO"
 
 # デフォルトのシンクを削除（重複防止）
 logger.remove()
@@ -34,14 +41,18 @@ logger.add(
 )
 
 # ファイル出力（日次ローテーション）
-logger.add(
-    LOG_DIR / "promptkeep_{time:YYYY-MM-DD}.log",
-    level=LOG_LEVEL,
-    format="{time:YYYY-MM-DD HH:mm:ss} | {level: <8} | {name}:{function}:{line} | {message}",
-    rotation="1 day",
-    retention="7 days",
-    encoding="utf-8",
-)
+try:
+    logger.add(
+        LOG_DIR / "promptkeep_{time:YYYY-MM-DD}.log",
+        level=LOG_LEVEL,
+        format="{time:YYYY-MM-DD HH:mm:ss} | {level: <8} | {name}:{function}:{line} | {message}",
+        rotation="1 day",
+        retention="7 days",
+        encoding="utf-8",
+    )
+except Exception:
+    # ファイル出力の設定に失敗した場合はスキップ（コンソール出力のみ）
+    pass
 
 # モジュールからloggerをインポート可能にする
 __all__ = ["logger"]
